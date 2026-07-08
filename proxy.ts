@@ -1,21 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-
-// In-memory store for rate limiting
-// Structure: Key (IP + type) -> { count, resetTime }
-interface LimitRecord {
-  count: number;
-  resetTime: number;
-}
-
-const limiter = new Map<string, LimitRecord>();
-
-// Configurations
-const WINDOW_MS = 60 * 1000; // 1 minute window
-const LIMITS = {
-  auth: 60,       // 60 requests per minute for login/register endpoints
-  general: 100,   // 100 requests per minute for all other API endpoints
-};
+import { checkUpstashLimit } from "@/lib/upstash-limiter";
 
 // Allowed origins for CORS configurations
 const allowedOrigins = [process.env.CLIENT_URL].filter(Boolean) as string[];
@@ -49,47 +34,7 @@ const getClientIP = (request: NextRequest): string => {
   return (request as any).ip || "127.0.0.1";
 };
 
-/**
- * Validates rate limit status for a given IP and API path.
- */
-const checkRateLimit = (ip: string, path: string) => {
-  const now = Date.now();
-  // Match login/register routes
-  const isAuth = path.startsWith("/api/auth/login") || path.startsWith("/api/auth/register");
-  const limit = isAuth ? LIMITS.auth : LIMITS.general;
-  
-  const key = `${ip}:${isAuth ? "auth" : "gen"}`;
-  const record = limiter.get(key);
 
-  if (!record || now > record.resetTime) {
-    const newRecord = {
-      count: 1,
-      resetTime: now + WINDOW_MS,
-    };
-    limiter.set(key, newRecord);
-
-    // Prune logic to prevent unbounded memory growth in the Map
-    if (limiter.size > 2000) {
-      for (const [k, v] of limiter.entries()) {
-        if (now > v.resetTime) {
-          limiter.delete(k);
-        }
-      }
-    }
-
-    return { limit, remaining: limit - 1, reset: Math.ceil(newRecord.resetTime / 1000), limited: false };
-  }
-
-  record.count += 1;
-  const remaining = Math.max(0, limit - record.count);
-  const reset = Math.ceil(record.resetTime / 1000);
-
-  if (record.count > limit) {
-    return { limit, remaining, reset, limited: true };
-  }
-
-  return { limit, remaining, reset, limited: false };
-};
 
 /**
  * Decorates the response with global security headers and CORS configurations.
@@ -155,20 +100,21 @@ export async function proxy(request: NextRequest) {
   // 3. Only apply rate limiting to API routes
   if (pathname.startsWith("/api")) {
     const ip = getClientIP(request);
-    const { limit, remaining, reset, limited } = checkRateLimit(ip, pathname);
+    const { success, limit, remaining, reset } = await checkUpstashLimit(ip, pathname);
 
-    if (limited) {
+    if (!success) {
       const response = new NextResponse(
         JSON.stringify({
-          error: "Too many requests. Please try again in a minute.",
+          error: "Too many requests. Please slow down and try again shortly.",
         }),
         {
           status: 429,
           headers: {
             "Content-Type": "application/json",
             "X-RateLimit-Limit": limit.toString(),
-            "X-RateLimit-Remaining": remaining.toString(),
+            "X-RateLimit-Remaining": "0",
             "X-RateLimit-Reset": reset.toString(),
+            "Retry-After": reset.toString(),
           },
         }
       );
