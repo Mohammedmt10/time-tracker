@@ -13,7 +13,7 @@ const limiter = new Map<string, LimitRecord>();
 // Configurations
 const WINDOW_MS = 60 * 1000; // 1 minute window
 const LIMITS = {
-  auth: 10,       // 10 requests per minute for login/register endpoints
+  auth: 60,       // 60 requests per minute for login/register endpoints
   general: 100,   // 100 requests per minute for all other API endpoints
 };
 
