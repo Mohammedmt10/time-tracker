@@ -15,7 +15,7 @@ interface TimeTrackerProps {
 }
 
 export default function TimeTracker({ onLogTime }: TimeTrackerProps) {
-  const { token } = useAuth();
+  const { token, authFetch } = useAuth();
   const [isActive, setIsActive] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [description, setDescription] = useState("");
@@ -57,11 +57,10 @@ export default function TimeTracker({ onLogTime }: TimeTrackerProps) {
         };
 
         // Use keepalive: true to ensure the request completes after browser/tab closes
-        fetch("/api/logs", {
+        authFetch("/api/logs", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(payload),
           keepalive: true,

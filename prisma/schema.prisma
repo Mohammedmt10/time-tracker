@@ -16,6 +16,7 @@ model User {
   password  String    // bcrypt hash — never stored in plaintext
   createdAt DateTime  @default(now())
   logs      TimeLog[]
+  refreshTokens RefreshToken[]
 
   @@map("users")
 }
@@ -33,4 +34,15 @@ model TimeLog {
   updatedAt   DateTime @updatedAt
 
   @@map("time_logs")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
 }

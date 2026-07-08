@@ -18,6 +18,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
+  authFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,36 +29,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // Load token and verify user on mount
+  // Load token and verify user on mount using the refresh token cookie
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        const storedToken = localStorage.getItem("worktime_auth_token");
-        if (!storedToken) {
-          setLoading(false);
-          return;
-        }
-
-        setToken(storedToken);
-
-        // Verify token by calling /api/auth/me
-        const res = await fetch("/api/auth/me", {
-          headers: {
-            Authorization: `Bearer ${storedToken}`,
-          },
+        const res = await fetch("/api/auth/refresh", {
+          method: "POST",
         });
 
         if (res.ok) {
           const data = await res.json();
+          setToken(data.token);
           setUser(data.user);
         } else {
-          // Token is invalid/expired
-          localStorage.removeItem("worktime_auth_token");
           setToken(null);
           setUser(null);
         }
       } catch (err) {
-        // Auth initialization failed
+        // Initialization failed
       } finally {
         setLoading(false);
       }
@@ -65,6 +54,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initializeAuth();
   }, []);
+
+  // Setup silent refresh interval (every 14 minutes) to fetch new access token
+  useEffect(() => {
+    if (!token) return;
+
+    const refreshInterval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/auth/refresh", { method: "POST" });
+        if (res.ok) {
+          const data = await res.json();
+          setToken(data.token);
+          setUser(data.user);
+        } else {
+          logout();
+        }
+      } catch (err) {
+        // Ignore failure and retry on next interval (or let 401 handling take care of it)
+      }
+    }, 14 * 60 * 1000);
+
+    return () => clearInterval(refreshInterval);
+  }, [token]);
 
   const login = async (email: string, password: string) => {
     try {
@@ -82,7 +93,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: data.error || "Login failed" };
       }
 
-      localStorage.setItem("worktime_auth_token", data.token);
       setToken(data.token);
       setUser(data.user);
       router.push("/");
@@ -108,7 +118,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: data.error || "Registration failed" };
       }
 
-      localStorage.setItem("worktime_auth_token", data.token);
       setToken(data.token);
       setUser(data.user);
       router.push("/");
@@ -118,11 +127,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem("worktime_auth_token");
+  const logout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (err) {
+      // Ignore network error on logout
+    }
     setToken(null);
     setUser(null);
     router.push("/login");
+  };
+
+  // Auth fetch wrapper that handles authorization header and automatic token refreshing on 401
+  const authFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const headers = new Headers(init?.headers);
+    let currentToken = token;
+
+    if (currentToken) {
+      headers.set("Authorization", `Bearer ${currentToken}`);
+    }
+
+    const fetchOptions: RequestInit = {
+      ...init,
+      headers,
+    };
+
+    let res = await fetch(input, fetchOptions);
+
+    if (res.status === 401 && currentToken) {
+      try {
+        const refreshRes = await fetch("/api/auth/refresh", { method: "POST" });
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json();
+          const newToken = refreshData.token;
+          
+          setToken(newToken);
+          setUser(refreshData.user);
+
+          headers.set("Authorization", `Bearer ${newToken}`);
+          res = await fetch(input, { ...init, headers });
+        } else {
+          logout();
+        }
+      } catch (err) {
+        logout();
+      }
+    }
+
+    return res;
   };
 
   return (
@@ -135,6 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         register,
         logout,
+        authFetch,
       }}
     >
       {children}

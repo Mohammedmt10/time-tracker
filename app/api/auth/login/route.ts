@@ -7,10 +7,11 @@
  */
 
 import { type NextRequest } from "next/server";
+import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { signJwt } from "@/lib/auth";
+import { signJwt, createRefreshToken } from "@/lib/auth";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -49,6 +50,16 @@ export async function POST(request: NextRequest) {
     }
 
     const token = await signJwt({ userId: user.id, email: user.email });
+    const refreshToken = await createRefreshToken(user.id);
+
+    const cookieStore = await cookies();
+    cookieStore.set("refresh_token", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+    });
 
     return Response.json({
       token,

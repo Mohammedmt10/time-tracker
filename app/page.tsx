@@ -61,7 +61,7 @@ const playThemeToggleSound = (isDark: boolean) => {
 };
 
 export default function Home() {
-  const { user, token, isAuthenticated, loading, logout } = useAuth();
+  const { user, token, isAuthenticated, loading, logout, authFetch } = useAuth();
   const router = useRouter();
 
   const [logs, setLogs] = useState<TimeLog[]>([]);
@@ -87,11 +87,7 @@ export default function Home() {
 
     const fetchLogs = async () => {
       try {
-        const res = await fetch("/api/logs", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const res = await authFetch("/api/logs");
         if (res.ok) {
           const data = await res.json();
           const mappedLogs = data.logs.map((log: any) => ({
@@ -140,11 +136,10 @@ export default function Home() {
   const handleLogTime = async (newLogData: Omit<TimeLog, "id">) => {
     if (!token) return;
     try {
-      const res = await fetch("/api/logs", {
+      const res = await authFetch("/api/logs", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(newLogData),
       });
@@ -173,11 +168,8 @@ export default function Home() {
     if (!token) return;
     if (confirm("Are you sure you want to delete this log entry?")) {
       try {
-        const res = await fetch(`/api/logs/${id}`, {
+        const res = await authFetch(`/api/logs/${id}`, {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
         });
 
         if (res.ok) {
@@ -192,11 +184,10 @@ export default function Home() {
   const handleUpdateLog = async (id: string, description: string) => {
     if (!token) return;
     try {
-      const res = await fetch(`/api/logs/${id}`, {
+      const res = await authFetch(`/api/logs/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ description }),
       });
