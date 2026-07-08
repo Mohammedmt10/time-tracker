@@ -11,7 +11,6 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -39,11 +38,41 @@ export default function RegisterPage() {
     setError(null);
     setIsSubmitting(true);
 
-    const result = await register(email, password, recaptchaToken || undefined);
+    try {
+      let token = process.env.NODE_ENV === "development" ? "dev-dummy-token" : "";
+      const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+      if (process.env.NODE_ENV === "production" && siteKey && window.grecaptcha) {
+        // Execute reCAPTCHA v3
+        token = await new Promise<string>((resolve) => {
+          window.grecaptcha.ready(async () => {
+            try {
+              const resToken = await window.grecaptcha.execute(siteKey, {
+                action: "register",
+              });
+              resolve(resToken);
+            } catch (err) {
+              console.error("Error executing grecaptcha:", err);
+              resolve("");
+            }
+          });
+        });
+      }
 
-    setIsSubmitting(false);
-    if (!result.success) {
-      setError(result.error || "Registration failed. Please try again.");
+      if (!token && siteKey && process.env.NODE_ENV === "production") {
+        setError("reCAPTCHA verification failed. Please refresh and try again.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const result = await register(email, password, token || undefined);
+
+      setIsSubmitting(false);
+      if (!result.success) {
+        setError(result.error || "Registration failed. Please try again.");
+      }
+    } catch (err) {
+      setError("An unexpected error occurred during signup.");
+      setIsSubmitting(false);
     }
   };
 
@@ -147,18 +176,15 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* Google reCAPTCHA */}
-            {process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY && (
-              <ReCAPTCHA
-                sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
-                onChange={(token) => setRecaptchaToken(token)}
-              />
+            {/* Google reCAPTCHA (only rendered in production to avoid domain errors on localhost) */}
+            {process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY && process.env.NODE_ENV === "production" && (
+              <ReCAPTCHA sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY} />
             )}
 
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isSubmitting || !recaptchaToken}
+              disabled={isSubmitting}
               className="w-full flex items-center justify-center gap-2 py-3 px-4 mt-2 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-semibold rounded-xl text-sm shadow-button transition-all duration-200 disabled:opacity-75 disabled:pointer-events-none group"
             >
               {isSubmitting ? (

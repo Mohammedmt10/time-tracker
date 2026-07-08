@@ -18,10 +18,12 @@ import {
   clearAuthFailures,
   getThrottleDelay,
 } from "@/lib/auth-limiter";
+import { verifyRecaptcha } from "@/lib/recaptcha";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
+  recaptchaToken: z.string().min(1, "reCAPTCHA token is required"),
 });
 
 /**
@@ -52,8 +54,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email, password } = parsed.data;
+    const { email, password, recaptchaToken } = parsed.data;
     const ip = getClientIP(request);
+
+    // 1. Verify reCAPTCHA token first
+    const isCaptchaValid = await verifyRecaptcha(recaptchaToken);
+    if (!isCaptchaValid) {
+      return Response.json(
+        { error: "reCAPTCHA verification failed. Please try again." },
+        { status: 400 }
+      );
+    }
 
     // 1. Check if the IP or Email is currently locked out
     const { locked, timeLeft, failures } = await checkAuthLockout(ip, email);

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { Mail, Lock, ArrowRight, Clock, Sparkles } from "lucide-react";
+import ReCAPTCHA from "@/components/ReCAPTCHA";
 
 export default function LoginPage() {
   const { login, isAuthenticated, loading } = useAuth();
@@ -27,11 +28,41 @@ export default function LoginPage() {
     setError(null);
     setIsSubmitting(true);
 
-    const result = await login(email, password);
+    try {
+      let token = process.env.NODE_ENV === "development" ? "dev-dummy-token" : "";
+      const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+      if (process.env.NODE_ENV === "production" && siteKey && window.grecaptcha) {
+        // Execute reCAPTCHA v3
+        token = await new Promise<string>((resolve) => {
+          window.grecaptcha.ready(async () => {
+            try {
+              const resToken = await window.grecaptcha.execute(siteKey, {
+                action: "login",
+              });
+              resolve(resToken);
+            } catch (err) {
+              console.error("Error executing grecaptcha:", err);
+              resolve("");
+            }
+          });
+        });
+      }
 
-    setIsSubmitting(false);
-    if (!result.success) {
-      setError(result.error || "Invalid email or password.");
+      if (!token && siteKey && process.env.NODE_ENV === "production") {
+        setError("reCAPTCHA verification failed. Please refresh and try again.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const result = await login(email, password, token || undefined);
+
+      setIsSubmitting(false);
+      if (!result.success) {
+        setError(result.error || "Invalid email or password.");
+      }
+    } catch (err) {
+      setError("An unexpected error occurred during sign in.");
+      setIsSubmitting(false);
     }
   };
 
@@ -118,6 +149,11 @@ export default function LoginPage() {
                 />
               </div>
             </div>
+
+            {/* Google reCAPTCHA (only rendered in production to avoid domain errors on localhost) */}
+            {process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY && process.env.NODE_ENV === "production" && (
+              <ReCAPTCHA sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY} />
+            )}
 
             {/* Submit Button */}
             <button
