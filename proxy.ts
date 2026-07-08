@@ -17,6 +17,21 @@ const LIMITS = {
   general: 100,   // 100 requests per minute for all other API endpoints
 };
 
+// Allowed origins for CORS configurations
+const allowedOrigins = [process.env.CLIENT_URL].filter(Boolean) as string[];
+
+// Automatically allow standard localhost development ports in development environment
+if (process.env.NODE_ENV === "development") {
+  allowedOrigins.push("http://localhost:3000");
+  allowedOrigins.push("http://localhost:3001");
+}
+
+const corsOptions = {
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, Cookie",
+  "Access-Control-Allow-Credentials": "true",
+};
+
 /**
  * Extracts the client's real IP address from request headers.
  */
@@ -77,9 +92,19 @@ const checkRateLimit = (ip: string, path: string) => {
 };
 
 /**
- * Injects standard security headers to protect against common web vulnerabilities.
+ * Decorates the response with global security headers and CORS configurations.
  */
-const addSecurityHeaders = (response: NextResponse): NextResponse => {
+const decorateResponse = (response: NextResponse, origin: string): NextResponse => {
+  // Add CORS headers if origin is allowed
+  if (origin && allowedOrigins.includes(origin)) {
+    response.headers.set("Access-Control-Allow-Origin", origin);
+    response.headers.set("Access-Control-Allow-Credentials", "true");
+    for (const [key, value] of Object.entries(corsOptions)) {
+      response.headers.set(key, value);
+    }
+  }
+
+  // Add security headers to prevent common vulnerabilities
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -96,18 +121,38 @@ const addSecurityHeaders = (response: NextResponse): NextResponse => {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const origin = request.headers.get("origin") || "";
 
-  // Basic Security Check: Block requests with completely empty/missing User-Agents
+  // 1. Handle CORS Preflight (OPTIONS) requests immediately
+  if (request.method === "OPTIONS") {
+    const isAllowed = allowedOrigins.includes(origin);
+    const preflightHeaders = new Headers();
+    if (isAllowed) {
+      preflightHeaders.set("Access-Control-Allow-Origin", origin);
+      preflightHeaders.set("Access-Control-Allow-Credentials", "true");
+    }
+    for (const [key, value] of Object.entries(corsOptions)) {
+      preflightHeaders.set(key, value);
+    }
+    // Set standard security headers on preflight responses too
+    preflightHeaders.set("X-Frame-Options", "DENY");
+    preflightHeaders.set("X-Content-Type-Options", "nosniff");
+    preflightHeaders.set("Referrer-Policy", "strict-origin-when-cross-origin");
+
+    return new NextResponse(null, { status: 204, headers: preflightHeaders });
+  }
+
+  // 2. Basic Security Check: Block requests with completely empty/missing User-Agents
   const userAgent = request.headers.get("user-agent") || "";
   if (!userAgent || userAgent.trim() === "") {
     const response = new NextResponse(
       JSON.stringify({ error: "Bad Request: Missing User-Agent header." }),
       { status: 400, headers: { "Content-Type": "application/json" } }
     );
-    return addSecurityHeaders(response);
+    return decorateResponse(response, origin);
   }
 
-  // Only apply rate limiting to API routes
+  // 3. Only apply rate limiting to API routes
   if (pathname.startsWith("/api")) {
     const ip = getClientIP(request);
     const { limit, remaining, reset, limited } = checkRateLimit(ip, pathname);
@@ -127,7 +172,7 @@ export async function proxy(request: NextRequest) {
           },
         }
       );
-      return addSecurityHeaders(response);
+      return decorateResponse(response, origin);
     }
 
     // Process the request normally
@@ -138,12 +183,12 @@ export async function proxy(request: NextRequest) {
     response.headers.set("X-RateLimit-Remaining", remaining.toString());
     response.headers.set("X-RateLimit-Reset", reset.toString());
 
-    return addSecurityHeaders(response);
+    return decorateResponse(response, origin);
   }
 
   // For non-API routes (pages, static resources, etc.), just add security headers
   const response = NextResponse.next();
-  return addSecurityHeaders(response);
+  return decorateResponse(response, origin);
 }
 
 export const config = {
