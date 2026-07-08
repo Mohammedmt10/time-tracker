@@ -46,3 +46,20 @@ model RefreshToken {
 
   @@map("refresh_tokens")
 }
+
+model RegistrationLimit {
+  id        String   @id @default(cuid())
+  ip        String
+  createdAt DateTime @default(now())
+
+  @@map("registration_limits")
+}
+
+model AuthFailure {
+  id        String   @id @default(cuid())
+  ip        String
+  email     String
+  createdAt DateTime @default(now())
+
+  @@map("auth_failures")
+}

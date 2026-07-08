@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     const ip = getClientIP(request);
 
     // 1. Check strict registration rate limit per IP (max 3 per hour)
-    const { limited: regLimited, timeLeft: regTimeLeft } = checkRegisterRateLimit(ip);
+    const { limited: regLimited, timeLeft: regTimeLeft } = await checkRegisterRateLimit(ip);
     if (regLimited) {
       return Response.json(
         { error: `Too many accounts registered from this IP. Please try again in ${regTimeLeft} seconds.` },
@@ -69,10 +69,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Track the registration attempt immediately (prevents concurrency bypasses)
-    trackRegisterAttempt(ip);
+    await trackRegisterAttempt(ip);
 
     // 2. Check if the IP or Email is currently locked out due to previous failures
-    const { locked, timeLeft, failures } = checkAuthLockout(ip, email);
+    const { locked, timeLeft, failures } = await checkAuthLockout(ip, email);
     if (locked) {
       return Response.json(
         { error: `Too many failed attempts. Please try again in ${timeLeft} seconds.` },
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
       // 3. Register failed registration attempt (conflict)
-      registerAuthFailure(ip, email);
+      await registerAuthFailure(ip, email);
 
       return Response.json(
         { error: "An account with this email already exists." },
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     });
 
     // 4. Clear failures registry on successful registration
-    clearAuthFailures(ip, email);
+    await clearAuthFailures(ip, email);
 
     const token = await signJwt({ userId: user.id, email: user.email });
     const refreshToken = await createRefreshToken(user.id);

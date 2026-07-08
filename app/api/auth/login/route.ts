@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     const ip = getClientIP(request);
 
     // 1. Check if the IP or Email is currently locked out
-    const { locked, timeLeft, failures } = checkAuthLockout(ip, email);
+    const { locked, timeLeft, failures } = await checkAuthLockout(ip, email);
     if (locked) {
       return Response.json(
         { error: `Too many failed attempts. Please try again in ${timeLeft} seconds.` },
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     if (!user || !passwordMatch) {
       // 3. Register failed login attempt
-      registerAuthFailure(ip, email);
+      await registerAuthFailure(ip, email);
 
       return Response.json(
         { error: "Invalid email or password." },
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Clear failures registry on successful login
-    clearAuthFailures(ip, email);
+    await clearAuthFailures(ip, email);
 
     const token = await signJwt({ userId: user.id, email: user.email });
     const refreshToken = await createRefreshToken(user.id);
