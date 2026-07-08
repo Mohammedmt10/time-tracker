@@ -190,7 +190,7 @@ export default function TimeTracker({ onLogTime }: TimeTrackerProps) {
                 <button
                   type="button"
                   onClick={isPaused ? handleResume : handlePause}
-                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-button transition-all duration-200 hover:translate-y-[-1px] ${
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-button transition-all duration-200 hover:-translate-y-px ${
                     isPaused
                       ? "bg-emerald-600 hover:bg-emerald-500"
                       : "bg-amber-600 hover:bg-amber-500"
@@ -205,7 +205,7 @@ export default function TimeTracker({ onLogTime }: TimeTrackerProps) {
                 <button
                   type="button"
                   onClick={handleStop}
-                  className="flex flex-1 sm:flex-none items-center justify-center gap-2 rounded-xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white shadow-button hover:bg-rose-500 focus:outline-none transition-all duration-200 hover:translate-y-[-1px]"
+                  className="flex flex-1 sm:flex-none items-center justify-center gap-2 rounded-xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white shadow-button hover:bg-rose-500 focus:outline-none transition-all duration-200 hover:-translate-y-px"
                 >
                   <Square size={12} fill="white" />
                   Clock Out

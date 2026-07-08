@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 
 // Configurations
+const WINDOW_15_MINUTES = 15 * 60 * 1000; // 15 minutes window
 const WINDOW_ONE_HOUR = 60 * 60 * 1000; // 1 hour window
 
 /**
@@ -19,29 +20,29 @@ export const getThrottleDelay = (failures: number): number => {
 
 /**
  * Checks strict registration rate limit per IP.
- * Restricts the number of registration attempts to 3 per hour.
+ * Restricts the number of registration attempts to 3 per 15 minutes.
  */
 export const checkRegisterRateLimit = async (
-  ip: string
+  ip: string,
 ): Promise<{ limited: boolean; timeLeft: number }> => {
   const now = new Date();
-  const oneHourAgo = new Date(now.getTime() - WINDOW_ONE_HOUR);
+  const fifteenMinsAgo = new Date(now.getTime() - WINDOW_15_MINUTES);
 
-  // Count the registration attempts in the last hour
+  // Count the registration attempts in the last 15 minutes
   const count = await prisma.registrationLimit.count({
     where: {
       ip,
-      createdAt: { gte: oneHourAgo },
+      createdAt: { gte: fifteenMinsAgo },
     },
   });
 
-  const MAX_REGISTRATIONS_PER_HOUR = 3;
-  if (count >= MAX_REGISTRATIONS_PER_HOUR) {
-    // Find the oldest registration in the last hour to calculate exact time left
+  const MAX_REGISTRATIONS_PER_15_MIN = 3;
+  if (count >= MAX_REGISTRATIONS_PER_15_MIN) {
+    // Find the oldest registration in the last 15 minutes to calculate exact time left
     const oldest = await prisma.registrationLimit.findFirst({
       where: {
         ip,
-        createdAt: { gte: oneHourAgo },
+        createdAt: { gte: fifteenMinsAgo },
       },
       orderBy: {
         createdAt: "asc",
@@ -49,7 +50,7 @@ export const checkRegisterRateLimit = async (
     });
 
     const oldestTime = oldest ? oldest.createdAt.getTime() : now.getTime();
-    const timeLeftMs = WINDOW_ONE_HOUR - (now.getTime() - oldestTime);
+    const timeLeftMs = WINDOW_15_MINUTES - (now.getTime() - oldestTime);
     return {
       limited: true,
       timeLeft: Math.max(0, Math.ceil(timeLeftMs / 1000)),
@@ -77,7 +78,7 @@ export const trackRegisterAttempt = async (ip: string): Promise<void> => {
  */
 export const checkAuthLockout = async (
   ip: string,
-  email: string
+  email: string,
 ): Promise<{ locked: boolean; timeLeft: number; failures: number }> => {
   const now = new Date();
   const oneHourAgo = new Date(now.getTime() - WINDOW_ONE_HOUR);
@@ -86,10 +87,7 @@ export const checkAuthLockout = async (
   // Count failures for either IP or Email in the last hour
   const failures = await prisma.authFailure.count({
     where: {
-      OR: [
-        { ip },
-        { email: normalizedEmail },
-      ],
+      OR: [{ ip }, { email: normalizedEmail }],
       createdAt: { gte: oneHourAgo },
     },
   });
@@ -109,10 +107,7 @@ export const checkAuthLockout = async (
     // Get the latest failure timestamp to check if the lockout period is still active
     const latest = await prisma.authFailure.findFirst({
       where: {
-        OR: [
-          { ip },
-          { email: normalizedEmail },
-        ],
+        OR: [{ ip }, { email: normalizedEmail }],
       },
       orderBy: {
         createdAt: "desc",
@@ -138,7 +133,10 @@ export const checkAuthLockout = async (
 /**
  * Registers a failed login or registration attempt in the database.
  */
-export const registerAuthFailure = async (ip: string, email: string): Promise<void> => {
+export const registerAuthFailure = async (
+  ip: string,
+  email: string,
+): Promise<void> => {
   const normalizedEmail = email.toLowerCase().trim();
 
   await prisma.authFailure.create({
@@ -152,15 +150,15 @@ export const registerAuthFailure = async (ip: string, email: string): Promise<vo
 /**
  * Clears the registry entries for an IP and Email upon successful login.
  */
-export const clearAuthFailures = async (ip: string, email: string): Promise<void> => {
+export const clearAuthFailures = async (
+  ip: string,
+  email: string,
+): Promise<void> => {
   const normalizedEmail = email.toLowerCase().trim();
 
   await prisma.authFailure.deleteMany({
     where: {
-      OR: [
-        { ip },
-        { email: normalizedEmail },
-      ],
+      OR: [{ ip }, { email: normalizedEmail }],
     },
   });
 };

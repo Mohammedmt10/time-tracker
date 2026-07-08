@@ -19,6 +19,7 @@ import {
   checkRegisterRateLimit,
   trackRegisterAttempt,
 } from "@/lib/auth-limiter";
+import { verifyRecaptcha } from "@/lib/recaptcha";
 
 const registerSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -26,6 +27,7 @@ const registerSchema = z.object({
     .string()
     .min(8, "Password must be at least 8 characters")
     .max(128),
+  recaptchaToken: z.string().min(1, "reCAPTCHA token is required"),
 });
 
 /**
@@ -56,8 +58,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email, password } = parsed.data;
+    const { email, password, recaptchaToken } = parsed.data;
     const ip = getClientIP(request);
+
+    // 1. Verify reCAPTCHA token first
+    const isCaptchaValid = await verifyRecaptcha(recaptchaToken);
+    if (!isCaptchaValid) {
+      return Response.json(
+        { error: "reCAPTCHA verification failed. Please try again." },
+        { status: 400 }
+      );
+    }
 
     // 1. Check strict registration rate limit per IP (max 3 per hour)
     const { limited: regLimited, timeLeft: regTimeLeft } = await checkRegisterRateLimit(ip);

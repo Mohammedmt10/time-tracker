@@ -4,12 +4,14 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { User, Mail, Lock, ArrowRight, Clock } from "lucide-react";
+import ReCAPTCHA from "@/components/ReCAPTCHA";
 
 export default function RegisterPage() {
   const { register, isAuthenticated, loading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -37,7 +39,7 @@ export default function RegisterPage() {
     setError(null);
     setIsSubmitting(true);
 
-    const result = await register(email, password);
+    const result = await register(email, password, recaptchaToken || undefined);
 
     setIsSubmitting(false);
     if (!result.success) {
@@ -145,10 +147,18 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            {/* Google reCAPTCHA */}
+            {process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY && (
+              <ReCAPTCHA
+                sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+                onChange={(token) => setRecaptchaToken(token)}
+              />
+            )}
+
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !recaptchaToken}
               className="w-full flex items-center justify-center gap-2 py-3 px-4 mt-2 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-semibold rounded-xl text-sm shadow-button transition-all duration-200 disabled:opacity-75 disabled:pointer-events-none group"
             >
               {isSubmitting ? (
