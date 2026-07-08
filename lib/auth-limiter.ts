@@ -128,3 +128,49 @@ export const clearAuthFailures = (ip: string, email: string): void => {
   ipRegistry.delete(ip);
   emailRegistry.delete(normalizedEmail);
 };
+
+const ipRegistrations = new Map<string, { timestamps: number[] }>();
+
+/**
+ * Checks strict registration rate limit per IP.
+ * Restricts the number of successful or attempted registrations to 3 per hour.
+ */
+export const checkRegisterRateLimit = (
+  ip: string
+): { limited: boolean; timeLeft: number } => {
+  const now = Date.now();
+  const ONE_HOUR = 60 * 60 * 1000;
+  const MAX_REGISTRATIONS_PER_HOUR = 3;
+
+  const record = ipRegistrations.get(ip);
+  if (!record) {
+    return { limited: false, timeLeft: 0 };
+  }
+
+  // Filter timestamps to only keep ones in the last 1 hour
+  record.timestamps = record.timestamps.filter((ts) => now - ts < ONE_HOUR);
+
+  if (record.timestamps.length >= MAX_REGISTRATIONS_PER_HOUR) {
+    const oldestTs = record.timestamps[0];
+    const timeLeftMs = ONE_HOUR - (now - oldestTs);
+    return {
+      limited: true,
+      timeLeft: Math.ceil(timeLeftMs / 1000),
+    };
+  }
+
+  return { limited: false, timeLeft: 0 };
+};
+
+/**
+ * Registers a registration attempt for an IP.
+ */
+export const trackRegisterAttempt = (ip: string): void => {
+  const now = Date.now();
+  const record = ipRegistrations.get(ip);
+  if (!record) {
+    ipRegistrations.set(ip, { timestamps: [now] });
+  } else {
+    record.timestamps.push(now);
+  }
+};

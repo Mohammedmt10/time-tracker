@@ -16,6 +16,8 @@ import {
   registerAuthFailure,
   clearAuthFailures,
   getThrottleDelay,
+  checkRegisterRateLimit,
+  trackRegisterAttempt,
 } from "@/lib/auth-limiter";
 
 const registerSchema = z.object({
@@ -57,7 +59,19 @@ export async function POST(request: NextRequest) {
     const { email, password } = parsed.data;
     const ip = getClientIP(request);
 
-    // 1. Check if the IP or Email is currently locked out
+    // 1. Check strict registration rate limit per IP (max 3 per hour)
+    const { limited: regLimited, timeLeft: regTimeLeft } = checkRegisterRateLimit(ip);
+    if (regLimited) {
+      return Response.json(
+        { error: `Too many accounts registered from this IP. Please try again in ${regTimeLeft} seconds.` },
+        { status: 429 }
+      );
+    }
+
+    // Track the registration attempt immediately (prevents concurrency bypasses)
+    trackRegisterAttempt(ip);
+
+    // 2. Check if the IP or Email is currently locked out due to previous failures
     const { locked, timeLeft, failures } = checkAuthLockout(ip, email);
     if (locked) {
       return Response.json(
@@ -66,7 +80,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Tarpitting: Add progressive response delay on repeated failures
+    // 3. Tarpitting: Add progressive response delay on repeated failures
     const delay = getThrottleDelay(failures);
     if (delay > 0) {
       await new Promise((resolve) => setTimeout(resolve, delay));
