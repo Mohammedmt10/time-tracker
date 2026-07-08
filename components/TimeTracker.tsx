@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Play, Pause, Square, Timer } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 interface TimeTrackerProps {
   onLogTime: (log: {
@@ -14,6 +15,7 @@ interface TimeTrackerProps {
 }
 
 export default function TimeTracker({ onLogTime }: TimeTrackerProps) {
+  const { token } = useAuth();
   const [isActive, setIsActive] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [description, setDescription] = useState("");
@@ -40,6 +42,38 @@ export default function TimeTracker({ onLogTime }: TimeTrackerProps) {
       }
     };
   }, [isActive, isPaused]);
+
+  // Listen for page unload/tab close to automatically save the active session to the DB
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (isActive && startTimeRef.current && token) {
+        const endTime = new Date().toISOString();
+        const payload = {
+          description: description.trim() || "Untitled Task",
+          project: "General",
+          startTime: startTimeRef.current,
+          endTime,
+          duration: seconds,
+        };
+
+        // Use keepalive: true to ensure the request completes after browser/tab closes
+        fetch("/api/logs", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+          keepalive: true,
+        });
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isActive, seconds, description, token]);
 
   const handleStart = () => {
     if (!description.trim()) {
