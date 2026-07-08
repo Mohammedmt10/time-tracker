@@ -59,6 +59,7 @@ export const createRefreshToken = async (userId: string): Promise<string> => {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
 
+  // Save the refresh token to the database (corresponds to the RefreshToken model in schema.prisma)
   await prisma.refreshToken.create({
     data: {
       token,
