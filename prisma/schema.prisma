@@ -1,0 +1,36 @@
+// This file configures the Prisma ORM schema (models + generator).
+// In Prisma 7, the datasource URL is configured in prisma.config.ts — not here.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  password  String    // bcrypt hash — never stored in plaintext
+  createdAt DateTime  @default(now())
+  logs      TimeLog[]
+
+  @@map("users")
+}
+
+model TimeLog {
+  id          String   @id @default(cuid())
+  description String
+  project     String   @default("General")
+  startTime   DateTime
+  endTime     DateTime
+  duration    Int      // duration in seconds
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("time_logs")
+}

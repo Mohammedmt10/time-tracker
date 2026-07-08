@@ -1,0 +1,187 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import { Play, Pause, Square, Timer } from "lucide-react";
+
+interface TimeTrackerProps {
+  onLogTime: (log: {
+    description: string;
+    project: string;
+    startTime: string;
+    endTime: string;
+    duration: number; // in seconds
+  }) => void;
+}
+
+export default function TimeTracker({ onLogTime }: TimeTrackerProps) {
+  const [isActive, setIsActive] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [description, setDescription] = useState("");
+  const [seconds, setSeconds] = useState(0);
+  const [error, setError] = useState(false);
+
+  const startTimeRef = useRef<string | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (isActive && !isPaused) {
+      intervalRef.current = setInterval(() => {
+        setSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [isActive, isPaused]);
+
+  const handleStart = () => {
+    if (!description.trim()) {
+      setError(true);
+      return;
+    }
+    setError(false);
+    setIsActive(true);
+    setIsPaused(false);
+    startTimeRef.current = new Date().toISOString();
+  };
+
+  const handlePause = () => {
+    setIsPaused(true);
+  };
+
+  const handleResume = () => {
+    setIsPaused(false);
+  };
+
+  const handleStop = () => {
+    if (!startTimeRef.current) return;
+
+    const endTime = new Date().toISOString();
+    onLogTime({
+      description: description.trim() || "Untitled Task",
+      project: "General",
+      startTime: startTimeRef.current,
+      endTime,
+      duration: seconds,
+    });
+
+    // Reset state
+    setIsActive(false);
+    setIsPaused(false);
+    setSeconds(0);
+    setDescription("");
+    startTimeRef.current = null;
+  };
+
+  const formatTime = (secs: number) => {
+    const hrs = Math.floor(secs / 3600);
+    const mins = Math.floor((secs % 3600) / 60);
+    const remainingSecs = secs % 60;
+
+    return [
+      hrs.toString().padStart(2, "0"),
+      mins.toString().padStart(2, "0"),
+      remainingSecs.toString().padStart(2, "0"),
+    ].join(":");
+  };
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl bg-card-bg p-6 shadow-card transition-all duration-300">
+      <div className="absolute top-0 right-0 -mr-6 -mt-6 h-24 w-24 rounded-full bg-indigo-500/5 blur-2xl"></div>
+      <div className="absolute bottom-0 left-0 -ml-6 -mb-6 h-24 w-24 rounded-full bg-violet-500/5 blur-2xl"></div>
+
+      <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        {/* Form Inputs */}
+        <div className="flex-1 w-full">
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+            What are you working on?
+            <span className="text-red-500 mr-1">&nbsp;&nbsp;*</span>
+          </label>
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              if (e.target.value.trim()) {
+                setError(false);
+              }
+            }}
+            disabled={isActive && !isPaused}
+            placeholder="e.g. Designing landing page hero section..."
+            className={`mt-2.5 w-full rounded-xl bg-input-bg px-4 py-3 text-sm text-text-primary outline-none transition-all placeholder:text-text-secondary/40 focus:bg-input-bg/70 ${
+              error
+                ? "border border-red-500/50 focus:border-red-500 focus:ring-1 focus:ring-red-500/10"
+                : "border border-transparent focus:border-indigo-500/50"
+            }`}
+          />
+          {error && (
+            <p className="mt-1.5 text-xs text-red-500 font-medium">
+              Please describe what you are working on before clocking in.
+            </p>
+          )}
+        </div>
+
+        {/* Stopwatch & Controls */}
+        <div className="flex flex-col sm:flex-row w-full sm:w-auto items-center gap-4 sm:gap-6 pt-3 sm:pt-6 self-stretch sm:self-center shrink-0">
+          <div className="text-center sm:text-right w-full sm:w-auto">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-1">
+              Elapsed Time
+            </span>
+            <div className="font-mono text-3xl font-black tracking-tight text-text-primary flex items-center justify-center sm:justify-end gap-2 leading-none h-9">
+              {isActive && !isPaused && (
+                <span className="h-2.5 w-2.5 rounded-full bg-indigo-600 animate-pulse"></span>
+              )}
+              {formatTime(seconds)}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-3 w-full sm:w-auto">
+            {!isActive ? (
+              <button
+                type="button"
+                onClick={handleStart}
+                className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl cursor-pointer bg-indigo-600 px-6 py-3.5 text-sm font-semibold text-white shadow-button focus:outline-none whitespace-nowrap"
+              >
+                <Play size={14} fill="white" />
+                Clock In
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={isPaused ? handleResume : handlePause}
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-button transition-all duration-200 hover:translate-y-[-1px] ${
+                    isPaused
+                      ? "bg-emerald-600 hover:bg-emerald-500"
+                      : "bg-amber-600 hover:bg-amber-500"
+                  }`}
+                >
+                  {isPaused ? (
+                    <Play size={14} fill="white" />
+                  ) : (
+                    <Pause size={14} fill="white" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleStop}
+                  className="flex flex-1 sm:flex-none items-center justify-center gap-2 rounded-xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white shadow-button hover:bg-rose-500 focus:outline-none transition-all duration-200 hover:translate-y-[-1px]"
+                >
+                  <Square size={12} fill="white" />
+                  Clock Out
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

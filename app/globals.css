@@ -1,26 +1,110 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fafafa; /* neutral-50 page background */
+  --foreground: #18181b; /* zinc-900 */
+  --card-bg: #ffffff; /* pure white cards */
+  --card-border: transparent; /* transparent borders */
+  --input-bg: #f8f9fa; /* extremely light off-white inputs */
+  --panel-bg: #f8f9fa; /* extremely light off-white for sub-panels */
+  --text-primary: #18181b; /* zinc-900 */
+  --text-secondary: #71717a; /* zinc-600 */
+  --card-shadow:
+    0 2px 6px -1px rgba(0, 0, 0, 0.03), 0 1px 3px -1px rgba(0, 0, 0, 0.02);
+  --button-shadow: 0 2px 4px 0 rgba(79, 70, 229, 0.08);
+}
+
+.dark {
+  --background: #09090b; /* zinc-950 */
+  --foreground: #f4f4f5; /* zinc-100 */
+  --card-bg: #18181b; /* zinc-900 */
+  --card-border: transparent; /* transparent borders */
+  --input-bg: #27272a; /* zinc-800 */
+  --panel-bg: #202023; /* custom dark panel background */
+  --text-primary: #f4f4f5; /* zinc-100 */
+  --text-secondary: #a1a1aa; /* zinc-400 */
+  --card-shadow: none;
+  --button-shadow: none;
+}
+
+/* Hide the page-level scrollbar everywhere */
+html {
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* IE / Edge */
+}
+html::-webkit-scrollbar {
+  display: none;                /* Chrome / Safari / Opera */
 }
 
 @theme inline {
+  --breakpoint-xs: 480px;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-card-bg: var(--card-bg);
+  --color-card-border: var(--card-border);
+  --color-input-bg: var(--input-bg);
+  --color-panel-bg: var(--panel-bg);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --font-sans: var(--font-signika);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-title: var(--font-merriweather-sans);
+  --font-subtitle: var(--font-raleway);
+  --shadow-card: var(--card-shadow);
+  --shadow-button: var(--button-shadow);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family:
+    var(--font-sans),
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+h1,
+.font-title {
+  font-family: var(--font-title), serif;
+}
+
+h2,
+.font-subtitle {
+  font-family: var(--font-subtitle), sans-serif;
+}
+
+/* Disable default old viewport snapshot fade-out */
+::view-transition-old(root) {
+  animation: none;
+  mix-blend-mode: normal;
+  height: 100%;
+  width: 100%;
+}
+
+/* Native GPU-accelerated horizontal curtain sweep-in keyframe */
+@keyframes sweep-in {
+  from {
+    clip-path: inset(0 0 100% 0); /* clipped to 0% height at the top */
+  }
+  to {
+    clip-path: inset(0 0 0 0);    /* sweeps to 100% height at the bottom */
+  }
+}
+
+/* Apply sweep-in directly to the incoming theme snapshot layer */
+::view-transition-new(root) {
+  animation: sweep-in 650ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  mix-blend-mode: normal;
+  height: 100%;
+  width: 100%;
 }
