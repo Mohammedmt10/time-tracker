@@ -37,6 +37,12 @@ WorkTime is a premium, responsive time tracking and productivity analytics dashb
 - **Security Headers**: `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `HSTS` (production only).
 - **Theme Transitions**: Seamless Light/Dark mode using GPU-accelerated View Transitions API.
 
+### 🛡️ Spoofing Attack Protections
+- **IP Spoofing (XFF)**: `lib/get-client-ip.ts` implements trusted-proxy-aware IP extraction. Controlled by `TRUSTED_PROXY_COUNT`, it takes the rightmost non-proxy IP from `X-Forwarded-For` instead of blindly trusting the attacker-controlled leftmost value — preventing rate-limit bypass via header injection.
+- **JWT Algorithm Confusion**: `verifyJwt` pins `algorithms: ["HS256"]`, explicitly rejecting `alg:"none"` unsigned tokens and RS256 algorithm-switch attacks.
+- **JWT Issuer/Audience Validation**: All tokens carry `iss` and `aud` claims set to `"worktime-tracker"`. Tokens from other services (even sharing the same secret) are rejected on verification.
+- **CSRF Origin Spoofing**: `lib/csrf.ts` validates the `Origin` header on all state-changing cookie endpoints (`/refresh`, `/logout`). Requests from foreign origins are rejected with `403` before any cookie or token logic runs.
+
 ---
 
 ## 🛠️ Technology Stack
@@ -111,6 +117,10 @@ RECAPTCHA_SECRET_KEY="your-recaptcha-secret-key"
 # Upstash Redis — from console.upstash.com
 UPSTASH_REDIS_REST_URL="https://your-db.upstash.io"
 UPSTASH_REDIS_REST_TOKEN="your-upstash-token"
+
+# Trusted Proxy Count (IP Spoofing protection)
+# 0 = direct connections, 1 = behind one reverse proxy/CDN (Vercel, Nginx)
+TRUSTED_PROXY_COUNT=1
 ```
 
 > **reCAPTCHA domain:** Register your production domain (e.g. `time.tajirsystems.com`) in the [reCAPTCHA Admin Console](https://www.google.com/recaptcha/admin) or you will see "Invalid domain for site key" errors.
@@ -138,6 +148,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | `npm run build` | Optimized production build |
 | `npm run start` | Run the production server |
 | `npm run lint` | ESLint checks |
+| `node scripts/test-spoofing.mjs` | Verify all 4 spoofing protections against the local dev server |
 
 ---
 
@@ -164,14 +175,18 @@ tracker-of-working/
 ├── context/
 │   └── AuthContext.tsx       # JWT state, login/register/logout, authFetch
 ├── lib/
-│   ├── auth.ts               # signJwt, verifyJwt, refresh token helpers
+│   ├── auth.ts               # signJwt / verifyJwt (HS256 pinned, iss+aud claims)
 │   ├── auth-limiter.ts       # Brute-force lockout + tarpitting (DB-backed)
+│   ├── csrf.ts               # CSRF Origin header validator (refresh, logout)
+│   ├── get-client-ip.ts      # Trusted-proxy-aware IP extraction (XFF spoofing fix)
 │   ├── middleware-auth.ts    # requireAuth() helper for API routes
 │   ├── prisma.ts             # Prisma client singleton
 │   ├── recaptcha.ts          # verifyRecaptcha() server-side helper
 │   └── upstash-limiter.ts   # Redis sliding-window rate limiter (fail-open)
 ├── prisma/
 │   └── schema.prisma         # Database models
+├── scripts/
+│   └── test-spoofing.mjs     # Automated spoofing protection test suite
 ├── proxy.ts                  # CORS + rate limiting + security headers proxy
 ├── prisma.config.ts          # Prisma 7 datasource config (reads DATABASE_URL)
 └── .env.local                # Local secrets (gitignored)
@@ -198,3 +213,29 @@ The layout is tailored for viewports down to **320px (Mobile S)**:
 3. **SVG Scrolling**: Analytics Chart uses `overflow-x-auto` to prevent text compression on narrow screens.
 4. **Form Optimization**: Auth card paddings scale down on mobile to maximize usable width.
 5. **Card/Table Switching**: Log History renders as collapsible cards on mobile and a dense table on desktop.
+
+---
+
+## 🧪 Security Testing
+
+A dedicated test script verifies all spoofing protections against the running local server:
+
+```bash
+# Start the dev server first
+npm run dev
+
+# In a second terminal, run the test suite
+node scripts/test-spoofing.mjs
+```
+
+The script tests all four attack vectors and exits with code `0` (all pass) or `1` (any failure):
+
+| Test | Attack | Expected |
+|------|--------|----------|
+| JWT `alg:none` | Unsigned token with no signature | `401` |
+| JWT wrong `iss` | Token from a different service | `401` |
+| JWT wrong `aud` | Token for a different audience | `401` |
+| CSRF on `/refresh` | `Origin: evil-attacker.com` header | `403` |
+| CSRF on `/logout` | `Origin: evil-attacker.com` header | `403` |
+| XFF spoofing | Crafted `X-Forwarded-For` chain | No crash, clean `4xx` |
+
