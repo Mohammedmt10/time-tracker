@@ -148,7 +148,6 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | `npm run build` | Optimized production build |
 | `npm run start` | Run the production server |
 | `npm run lint` | ESLint checks |
-| `node scripts/test-spoofing.mjs` | Verify all 4 spoofing protections against the local dev server |
 
 ---
 
@@ -214,28 +213,4 @@ The layout is tailored for viewports down to **320px (Mobile S)**:
 4. **Form Optimization**: Auth card paddings scale down on mobile to maximize usable width.
 5. **Card/Table Switching**: Log History renders as collapsible cards on mobile and a dense table on desktop.
 
----
-
-## 🧪 Security Testing
-
-A dedicated test script verifies all spoofing protections against the running local server:
-
-```bash
-# Start the dev server first
-npm run dev
-
-# In a second terminal, run the test suite
-node scripts/test-spoofing.mjs
-```
-
-The script tests all four attack vectors and exits with code `0` (all pass) or `1` (any failure):
-
-| Test | Attack | Expected |
-|------|--------|----------|
-| JWT `alg:none` | Unsigned token with no signature | `401` |
-| JWT wrong `iss` | Token from a different service | `401` |
-| JWT wrong `aud` | Token for a different audience | `401` |
-| CSRF on `/refresh` | `Origin: evil-attacker.com` header | `403` |
-| CSRF on `/logout` | `Origin: evil-attacker.com` header | `403` |
-| XFF spoofing | Crafted `X-Forwarded-For` chain | No crash, clean `4xx` |
 
