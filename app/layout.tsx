@@ -29,7 +29,33 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "WorkTime - Premium Work Tracker & Analytics",
-  description: "Track your day-to-day working hours, analyze historical patterns, and optimize your productivity with professional logs and SVG analytics.",
+  description:
+    "Track your day-to-day working hours, analyze historical patterns, and optimize your productivity with professional logs and SVG analytics.",
+  metadataBase: new URL("https://time.tajirsystems.com"),
+  openGraph: {
+    title: "WorkTime - Premium Work Tracker & Analytics",
+    description:
+      "Track your day-to-day working hours, analyze historical patterns, and optimize your productivity with professional logs and SVG analytics.",
+    url: "https://time.tajirsystems.com",
+    siteName: "WorkTime",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1024,
+        height: 512,
+        alt: "WorkTime dashboard — real-time time tracker and analytics",
+      },
+    ],
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "WorkTime - Premium Work Tracker & Analytics",
+    description:
+      "Track your day-to-day working hours, analyze historical patterns, and optimize your productivity with professional logs and SVG analytics.",
+    images: ["/og-image.png"],
+  },
 };
 
 export default function RootLayout({
