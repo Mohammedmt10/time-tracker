@@ -12,9 +12,10 @@ interface TimeTrackerProps {
     endTime: string;
     duration: number; // in seconds
   }) => void;
+  recentTasks?: string[];
 }
 
-export default function TimeTracker({ onLogTime }: TimeTrackerProps) {
+export default function TimeTracker({ onLogTime, recentTasks = [] }: TimeTrackerProps) {
   const { token, authFetch } = useAuth();
   const [isActive, setIsActive] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -133,10 +134,34 @@ export default function TimeTracker({ onLogTime }: TimeTrackerProps) {
       <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         {/* Form Inputs */}
         <div className="flex-1 w-full">
-          <label className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary">
-            What are you working on?
-            <span className="text-red-500 mr-1">&nbsp;&nbsp;*</span>
-          </label>
+          <div className="flex items-center justify-between gap-3 min-h-5 flex-wrap">
+            <label className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+              What are you working on?
+              <span className="text-red-500">*</span>
+            </label>
+            {recentTasks.length > 0 && !isActive && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="flex items-center text-[10px] font-medium text-text-secondary/50 uppercase tracking-wider hidden sm:flex shrink-0">
+                  Recently used:
+                </span>
+                {recentTasks.map((task) => (
+                  <button
+                    key={task}
+                    type="button"
+                    title={`Reuse: ${task}`}
+                    onClick={() => {
+                      setDescription(task);
+                      setError(false);
+                    }}
+                    className="flex items-center gap-1.5 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2.5 h-5 text-[10px] font-semibold text-indigo-500 dark:text-indigo-400 transition-all duration-200 hover:border-indigo-500/50 hover:bg-indigo-500/20 hover:scale-105 active:scale-95 cursor-pointer max-w-[140px]"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400 shrink-0" />
+                    <span className="truncate">{task}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <input
             type="text"
             value={description}

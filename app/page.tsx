@@ -335,7 +335,17 @@ export default function Home() {
         </div>
 
         {/* Tracking timer section */}
-        <TimeTracker onLogTime={handleLogTime} />
+        <TimeTracker
+          onLogTime={handleLogTime}
+          recentTasks={
+            logs
+              .reduce<string[]>((acc, log) => {
+                if (!acc.includes(log.description)) acc.push(log.description);
+                return acc;
+              }, [])
+              .slice(0, 3)
+          }
+        />
 
         {/* Key Indicators section */}
         <StatsPanel logs={logs} />
