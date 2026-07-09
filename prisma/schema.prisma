@@ -33,17 +33,21 @@ model TimeLog {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // Covers: findMany(where: { userId }, orderBy: { createdAt: desc }) — the main logs fetch
+  @@index([userId, createdAt(sort: Desc)])
   @@map("time_logs")
 }
 
 model RefreshToken {
   id        String   @id @default(cuid())
-  token     String   @unique
+  token     String   @unique  // already indexed — covers findUnique({ where: { token } })
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
 
+  // Covers: cascade deletes triggered by user deletion
+  @@index([userId])
   @@map("refresh_tokens")
 }
 
@@ -52,6 +56,8 @@ model RegistrationLimit {
   ip        String
   createdAt DateTime @default(now())
 
+  // Covers: count/findFirst(where: { ip, createdAt: { gte: window } })
+  @@index([ip, createdAt])
   @@map("registration_limits")
 }
 
@@ -61,5 +67,8 @@ model AuthFailure {
   email     String
   createdAt DateTime @default(now())
 
+  // Covers: count/findFirst(where: { OR: [{ ip }, { email }], createdAt: { gte: window } })
+  @@index([ip, createdAt])
+  @@index([email, createdAt])
   @@map("auth_failures")
 }
