@@ -44,6 +44,7 @@ export interface RateLimitResult {
 /**
  * Checks the rate limit for a given IP and API path.
  * Automatically selects the auth or general limiter based on the path.
+ * Fails open (allows the request) if Redis is unavailable or misconfigured.
  */
 export async function checkUpstashLimit(
   ip: string,
@@ -56,13 +57,20 @@ export async function checkUpstashLimit(
   const limiter = isAuth ? authLimiter : generalLimiter;
   const key = `${ip}`;
 
-  const { success, limit, remaining, reset } = await limiter.limit(key);
+  try {
+    const { success, limit, remaining, reset } = await limiter.limit(key);
 
-  return {
-    success,
-    limit,
-    remaining,
-    // Upstash returns reset as a millisecond timestamp; convert to seconds
-    reset: Math.ceil(reset / 1000),
-  };
+    return {
+      success,
+      limit,
+      remaining,
+      // Upstash returns reset as a millisecond timestamp; convert to seconds
+      reset: Math.ceil(reset / 1000),
+    };
+  } catch (err) {
+    // Fail open: if Redis is down or credentials are invalid, allow the request
+    // through rather than blocking all traffic. Log the error for debugging.
+    console.error("[upstash-limiter] Rate limit check failed, failing open:", err);
+    return { success: true, limit: 0, remaining: 0, reset: 0 };
+  }
 }

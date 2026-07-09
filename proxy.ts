@@ -3,7 +3,11 @@ import type { NextRequest } from "next/server";
 import { checkUpstashLimit } from "@/lib/upstash-limiter";
 
 // Allowed origins for CORS configurations
-const allowedOrigins = [process.env.CLIENT_URL].filter(Boolean) as string[];
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  // Explicit production domain fallback
+  "https://time.tajirsystems.com",
+].filter(Boolean) as string[];
 
 // Automatically allow standard localhost development ports in development environment
 if (process.env.NODE_ENV === "development") {

@@ -98,7 +98,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       router.push("/");
       return { success: true };
     } catch (err) {
-      return { success: false, error: "An unexpected error occurred. Please try again." };
+      console.error("Login fetch failed:", err);
+      const message = err instanceof Error ? err.message : "Network error. Check your connection and try again.";
+      return { success: false, error: message };
     }
   };
 
@@ -123,7 +125,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       router.push("/");
       return { success: true };
     } catch (err) {
-      return { success: false, error: "An unexpected error occurred. Please try again." };
+      console.error("Register fetch failed:", err);
+      const message = err instanceof Error ? err.message : "Network error. Check your connection and try again.";
+      return { success: false, error: message };
     }
   };
 
