@@ -274,7 +274,7 @@ export default function Home() {
 
             {/* User Profile */}
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xs font-bold shadow-sm shadow-indigo-500/10">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-linear-to-br from-indigo-500 to-purple-600 text-white text-xs font-bold shadow-sm shadow-indigo-500/10">
                 {user?.name ? user.name.slice(0, 2).toUpperCase() : user?.email ? user.email.slice(0, 2).toUpperCase() : "U"}
               </div>
               <div className="hidden sm:block text-left">
