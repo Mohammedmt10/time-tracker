@@ -8,9 +8,14 @@
 import { type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { revokeRefreshToken } from "@/lib/auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 export async function POST(request: NextRequest) {
   try {
+    // Guard: reject cross-origin requests to prevent CSRF origin spoofing
+    const csrfError = validateCsrfOrigin(request);
+    if (csrfError) return csrfError;
+
     const cookieStore = await cookies();
     const refreshToken = cookieStore.get("refresh_token")?.value;
 

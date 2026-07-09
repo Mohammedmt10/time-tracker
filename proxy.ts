@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { checkUpstashLimit } from "@/lib/upstash-limiter";
+import { getClientIp } from "@/lib/get-client-ip";
 
 // Allowed origins for CORS configurations
 const allowedOrigins = [
@@ -19,23 +20,6 @@ const corsOptions = {
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, Cookie",
   "Access-Control-Allow-Credentials": "true",
-};
-
-/**
- * Extracts the client's real IP address from request headers.
- */
-const getClientIP = (request: NextRequest): string => {
-  const xForwardedFor = request.headers.get("x-forwarded-for");
-  if (xForwardedFor) {
-    const ips = xForwardedFor.split(",");
-    return ips[0].trim();
-  }
-  const xRealIP = request.headers.get("x-real-ip");
-  if (xRealIP) {
-    return xRealIP.trim();
-  }
-  // Default fallback if running locally or behind standard proxies
-  return (request as any).ip || "127.0.0.1";
 };
 
 
@@ -103,7 +87,7 @@ export async function proxy(request: NextRequest) {
 
   // 3. Only apply rate limiting to API routes
   if (pathname.startsWith("/api")) {
-    const ip = getClientIP(request);
+    const ip = getClientIp(request);
     const { success, limit, remaining, reset } = await checkUpstashLimit(ip, pathname);
 
     if (!success) {

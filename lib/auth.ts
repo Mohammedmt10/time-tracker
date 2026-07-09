@@ -7,12 +7,21 @@
  *
  * SECURITY: This file is guarded by `import "server-only"` so Next.js will
  * throw a build-time error if it is accidentally imported in a Client Component.
+ *
+ * SPOOFING PROTECTIONS:
+ *  - Algorithm pinned to HS256 only — rejects "alg":"none" and RS256 confusion attacks.
+ *  - `iss` (issuer) and `aud` (audience) claims are set and verified — prevents
+ *    cross-service token replay where a token from another app with the same secret
+ *    could otherwise be accepted.
  */
 
 import "server-only";
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import crypto from "crypto";
 import { prisma } from "./prisma";
+
+/** Identifies this application as the sole valid token issuer and audience. */
+const APP_NAME = "worktime-tracker";
 
 export interface AuthPayload extends JWTPayload {
   userId: string;
@@ -32,21 +41,34 @@ const getSecret = (): Uint8Array => {
 /**
  * Signs a JWT with the user's id and email.
  * Token acts as a short-lived access token and expires in 15 minutes.
+ *
+ * Sets `iss` and `aud` to APP_NAME so cross-service token replay is rejected
+ * during verification.
  */
 export const signJwt = async (payload: Omit<AuthPayload, keyof JWTPayload>): Promise<string> => {
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("15m")
+    .setIssuer(APP_NAME)      // iss — who created the token
+    .setAudience(APP_NAME)    // aud — who the token is intended for
     .sign(getSecret());
 };
 
 /**
  * Verifies a JWT and returns the decoded payload.
- * Throws if the token is invalid or expired.
+ * Throws if the token is invalid, expired, uses a disallowed algorithm,
+ * or has an incorrect issuer / audience.
+ *
+ * SECURITY: `algorithms` is pinned to ["HS256"] to prevent algorithm
+ * confusion attacks (e.g. alg:"none" or switching to an asymmetric key).
  */
 export const verifyJwt = async (token: string): Promise<AuthPayload> => {
-  const { payload } = await jwtVerify(token, getSecret());
+  const { payload } = await jwtVerify(token, getSecret(), {
+    algorithms: ["HS256"],  // Pin algorithm — rejects alg:"none" and RS256 confusion
+    issuer: APP_NAME,       // Reject tokens signed by a different service
+    audience: APP_NAME,     // Reject tokens intended for a different audience
+  });
   return payload as AuthPayload;
 };
 

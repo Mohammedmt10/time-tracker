@@ -20,6 +20,7 @@ import {
   trackRegisterAttempt,
 } from "@/lib/auth-limiter";
 import { verifyRecaptcha } from "@/lib/recaptcha";
+import { getClientIp } from "@/lib/get-client-ip";
 
 const registerSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -30,21 +31,6 @@ const registerSchema = z.object({
   recaptchaToken: z.string().min(1, "reCAPTCHA token is required"),
 });
 
-/**
- * Safely extracts client IP address from headers.
- */
-const getClientIP = (request: NextRequest): string => {
-  const xForwardedFor = request.headers.get("x-forwarded-for");
-  if (xForwardedFor) {
-    const ips = xForwardedFor.split(",");
-    return ips[0].trim();
-  }
-  const xRealIP = request.headers.get("x-real-ip");
-  if (xRealIP) {
-    return xRealIP.trim();
-  }
-  return (request as any).ip || "127.0.0.1";
-};
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { email, password, recaptchaToken } = parsed.data;
-    const ip = getClientIP(request);
+    const ip = getClientIp(request);
 
     // 1. Verify reCAPTCHA token first
     const isCaptchaValid = await verifyRecaptcha(recaptchaToken);
