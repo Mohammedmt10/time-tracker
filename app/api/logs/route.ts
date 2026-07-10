@@ -62,65 +62,62 @@ export async function GET(request: NextRequest) {
 // ---------------------------------------------------------------------------
 // POST /api/logs
 // ---------------------------------------------------------------------------
+export async function POST(request: NextRequest) {
+  try {
+    const authUser = await requireAuth(request);
 
+    const body = await request.json();
+    const parsed = createLogSchema.safeParse(body);
 
-function splitByDay(startTime: Date, endTime: Date, duration: number) {
-  const totalMs = endTime.getTime() - startTime.getTime();
-  const segments: { startTime: Date; endTime: Date; duration: number }[] = [];
+    if (!parsed.success) {
+      return Response.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
 
-  let segStart = startTime;
+    const { description, project, startTime, endTime, duration } = parsed.data;
 
-  while (segStart < endTime) {
-    const dayEnd = new Date(segStart);
-    dayEnd.setHours(24, 0, 0, 0);
-
-    const segEnd = dayEnd < endTime ? dayEnd : endTime;
-    const share = (segEnd.getTime() - segStart.getTime()) / totalMs;
-
-    segments.push({
-      startTime: segStart,
-      endTime: segEnd,
-      duration: Math.round(duration * share),
+    // Check if the user already has a log entry for this exact task description and project
+    const existingLog = await prisma.timeLog.findFirst({
+      where: {
+        userId: authUser.userId,
+        description: description.trim(),
+        project: project.trim(),
+      },
     });
 
-    segStart = segEnd;
-  }
+    if (existingLog) {
+      const updatedLog = await prisma.timeLog.update({
+        where: { id: existingLog.id },
+        data: {
+          duration: existingLog.duration + duration,
+          startTime: new Date(startTime), // update to latest start time
+          endTime: new Date(endTime),     // update to latest end time
+        },
+        select: {
+          id: true,
+          description: true,
+          project: true,
+          startTime: true,
+          endTime: true,
+          duration: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
 
-  return segments;
-}
+      return Response.json({ log: updatedLog }, { status: 200 });
+    }
 
-async function createOrUpdateLog({
-  userId,
-  description,
-  project,
-  segment,
-}: {
-  userId: string;
-  description: string;
-  project: string;
-  segment: {
-    startTime: Date;
-    endTime: Date;
-    duration: number;
-  };
-}) {
-  const existingLog = await prisma.timeLog.findFirst({
-    where: {
-      userId,
-      description,
-      project,
-      startTime: segment.startTime,
-      endTime: segment.endTime,
-    },
-  });
-
-  if (existingLog) {
-    return prisma.timeLog.update({
-      where: { id: existingLog.id },
+    const log = await prisma.timeLog.create({
       data: {
-        duration: existingLog.duration + segment.duration,
-        startTime: segment.startTime,
-        endTime: segment.endTime,
+        description: description.trim(),
+        project: project.trim(),
+        startTime: new Date(startTime),
+        endTime: new Date(endTime),
+        duration,
+        userId: authUser.userId,
       },
       select: {
         id: true,
@@ -133,80 +130,12 @@ async function createOrUpdateLog({
         updatedAt: true,
       },
     });
-  }
 
-  return prisma.timeLog.create({
-    data: {
-      userId,
-      description,
-      project,
-      startTime: segment.startTime,
-      endTime: segment.endTime,
-      duration: segment.duration,
-    },
-    select: {
-      id: true,
-      description: true,
-      project: true,
-      startTime: true,
-      endTime: true,
-      duration: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const authUser = await requireAuth(request);
-
-    const body = await request.json();
-    const parsed = createLogSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return Response.json(
-        {
-          error: "Validation failed",
-          details: parsed.error.flatten().fieldErrors,
-        },
-        { status: 400 }
-      );
-    }
-
-    const { description, project, startTime, endTime, duration } = parsed.data;
-
-    const segments = splitByDay(
-      new Date(startTime),
-      new Date(endTime),
-      duration
-    );
-
-    const logs = await Promise.all(
-      segments.map((segment) =>
-        createOrUpdateLog({
-          userId: authUser.userId,
-          description: description.trim(),
-          project: project.trim(),
-          segment,
-        })
-      )
-    );
-
-    return Response.json(
-      {
-        logs,
-      },
-      { status: 201 }
-    );
+    return Response.json({ log }, { status: 201 });
   } catch (error) {
     if (error instanceof AuthError) {
       return unauthorizedResponse(error.message);
     }
-
-    return Response.json(
-      { error: "Internal server error." },
-      { status: 500 }
-    );
+    return Response.json({ error: "Internal server error." }, { status: 500 });
   }
 }
