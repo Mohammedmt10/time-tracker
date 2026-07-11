@@ -24,8 +24,8 @@ interface TimeLog {
 
 interface LogHistoryProps {
   logs: TimeLog[];
-  onDeleteLog: (id: string) => void;
-  onUpdateLog: (id: string, description: string) => void;
+  onDeleteLog: (id: string | string[]) => void;
+  onUpdateLog: (id: string | string[], description: string) => void;
 }
 
 export default function LogHistory({
@@ -53,35 +53,35 @@ export default function LogHistory({
     return parts.join(" ");
   };
 
-  const formatTimeRange = (startStr: string, endStr: string) => {
+  const formatSessionDate = (startStr: string, endStr: string) => {
     const start = new Date(startStr);
     const end = new Date(endStr);
 
-    const formatTime = (d: Date) => {
-      return d.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      });
-    };
-
-    return `${formatTime(start)} - ${formatTime(end)}`;
-  };
-
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString("en-US", {
+    const startFmt = start.toLocaleDateString("en-US", {
       weekday: "short",
       year: "numeric",
       month: "short",
       day: "numeric",
     });
+
+    const endFmt = end.toLocaleDateString("en-US", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+
+    if (startFmt === endFmt) {
+      return startFmt;
+    }
+
+    return `${startFmt} - ${endFmt}`;
   };
 
   // Start editing
-  const startEditing = (log: TimeLog) => {
-    setEditingId(log.id);
-    setEditDesc(log.description);
+  const startEditing = (session: { id: string; description: string }) => {
+    setEditingId(session.id);
+    setEditDesc(session.description);
   };
 
   const cancelEditing = () => {
@@ -89,8 +89,8 @@ export default function LogHistory({
     setEditDesc("");
   };
 
-  const saveEdit = (id: string) => {
-    onUpdateLog(id, editDesc.trim() || "Untitled Task");
+  const saveEdit = (idOrIds: string | string[]) => {
+    onUpdateLog(idOrIds, editDesc.trim() || "Untitled Task");
     setEditingId(null);
   };
 
@@ -104,6 +104,62 @@ export default function LogHistory({
       log.description === selectedFilterTask;
     return matchesSearch && matchesTask;
   });
+
+  // Reconstruct sessions from contiguous segments
+  const groupLogsIntoSessions = (rawLogs: TimeLog[]) => {
+    if (rawLogs.length === 0) return [];
+
+    // Sort by startTime ascending to easily find contiguous segments
+    const sorted = [...rawLogs].sort(
+      (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    );
+
+    const sessions: {
+      id: string;
+      description: string;
+      project: string;
+      startTime: string;
+      endTime: string;
+      duration: number;
+      segmentIds: string[];
+    }[] = [];
+
+    for (const log of sorted) {
+      // Find if there is an existing session that ends exactly when this log starts,
+      // and has the same description and project
+      const matchingSessionIndex = sessions.findIndex(
+        (s) =>
+          s.description === log.description &&
+          s.project === log.project &&
+          s.endTime === log.startTime
+      );
+
+      if (matchingSessionIndex !== -1) {
+        // Merge into the existing session
+        sessions[matchingSessionIndex].endTime = log.endTime;
+        sessions[matchingSessionIndex].duration += log.duration;
+        sessions[matchingSessionIndex].segmentIds.push(log.id);
+      } else {
+        // Create a new session
+        sessions.push({
+          id: log.id,
+          description: log.description,
+          project: log.project,
+          startTime: log.startTime,
+          endTime: log.endTime,
+          duration: log.duration,
+          segmentIds: [log.id],
+        });
+      }
+    }
+
+    // Sort sessions back to descending order of startTime (newest first)
+    return sessions.sort(
+      (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+    );
+  };
+
+  const groupedSessions = groupLogsIntoSessions(filteredLogs);
 
   // Get unique task descriptions dynamically
   const uniqueTasks = [
@@ -244,7 +300,7 @@ export default function LogHistory({
                 onClick={() => setIsDropdownOpen(false)}
               />
 
-              {/* Custom Dropdown Items card */}
+              {/* Dropdown menu */}
               <div className="absolute right-0 mt-1.5 z-30 w-max min-w-full max-w-xs rounded-xl border border-panel-bg bg-card-bg p-1 shadow-lg ring-1 ring-black/5 animate-in fade-in slide-in-from-top-1 duration-150">
                 {uniqueTasks.map((task) => (
                   <button
@@ -277,7 +333,7 @@ export default function LogHistory({
 
       {/* Logs Table / Grid */}
       <div className="mt-6">
-        {filteredLogs.length === 0 ? (
+        {groupedSessions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <Clock className="text-text-secondary/40" size={40} />
             <span className="mt-3 text-sm font-semibold text-text-secondary">
@@ -299,7 +355,6 @@ export default function LogHistory({
                     Task
                   </th>
                   <th className="py-2.5 px-4 font-semibold">Date</th>
-                  <th className="py-2.5 px-4 font-semibold">Time Range</th>
                   <th className="py-2.5 px-4 font-semibold text-right">
                     Duration
                   </th>
@@ -309,11 +364,11 @@ export default function LogHistory({
                 </tr>
               </thead>
               <tbody className="divide-y divide-panel-bg/20">
-                {filteredLogs.map((log) => {
-                  const isEditing = editingId === log.id;
+                {groupedSessions.map((session) => {
+                  const isEditing = editingId === session.id;
 
                   return (
-                    <tr key={log.id} className="hover:bg-panel-bg/30">
+                    <tr key={session.id} className="hover:bg-panel-bg/30">
                       {/* Description cell */}
                       <td className="py-3.5 px-4">
                         {isEditing ? (
@@ -325,7 +380,7 @@ export default function LogHistory({
                           />
                         ) : (
                           <span className="font-medium text-text-primary">
-                            {log.description}
+                            {session.description}
                           </span>
                         )}
                       </td>
@@ -334,18 +389,13 @@ export default function LogHistory({
                       <td className="py-3.5 px-4 whitespace-nowrap text-text-secondary">
                         <div className="flex items-center gap-1.5">
                           <Calendar size={13} />
-                          {formatDate(log.startTime)}
+                          {formatSessionDate(session.startTime, session.endTime)}
                         </div>
-                      </td>
-
-                      {/* Time range cell */}
-                      <td className="py-3.5 px-4 whitespace-nowrap text-text-secondary">
-                        {formatTimeRange(log.startTime, log.endTime)}
                       </td>
 
                       {/* Duration cell */}
                       <td className="py-3.5 px-4 text-right font-mono font-semibold text-text-primary">
-                        {formatDuration(log.duration)}
+                        {formatDuration(session.duration)}
                       </td>
 
                       {/* Action buttons cell */}
@@ -353,7 +403,7 @@ export default function LogHistory({
                         {isEditing ? (
                           <div className="flex items-center justify-center gap-1.5">
                             <button
-                              onClick={() => saveEdit(log.id)}
+                              onClick={() => saveEdit(session.segmentIds)}
                               className="rounded p-1 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
                               title="Save changes"
                             >
@@ -370,14 +420,14 @@ export default function LogHistory({
                         ) : (
                           <div className="flex items-center justify-center gap-1.5">
                             <button
-                              onClick={() => startEditing(log)}
+                              onClick={() => startEditing(session)}
                               className="rounded p-1 text-text-secondary hover:bg-panel-bg hover:text-text-primary"
                               title="Edit description/project"
                             >
                               <Edit2 size={15} />
                             </button>
                             <button
-                              onClick={() => onDeleteLog(log.id)}
+                              onClick={() => onDeleteLog(session.segmentIds)}
                               className="rounded p-1 text-text-secondary hover:bg-rose-550/20 hover:text-rose-600"
                               title="Delete log"
                             >
@@ -392,13 +442,13 @@ export default function LogHistory({
               </tbody>
             </table>
 
-            {/* Mobile List View (collapsible cards) */}
+            {/* Mobile List View */}
             <div className="flex flex-col gap-3 md:hidden">
-              {filteredLogs.map((log) => {
-                const isEditing = editingId === log.id;
+              {groupedSessions.map((session) => {
+                const isEditing = editingId === session.id;
 
                 return (
-                  <div key={log.id} className="rounded-xl bg-panel-bg/25 p-4">
+                  <div key={session.id} className="rounded-xl bg-panel-bg/25 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 space-y-1.5">
                         {isEditing ? (
@@ -410,14 +460,14 @@ export default function LogHistory({
                           />
                         ) : (
                           <span className="font-semibold text-text-primary">
-                            {log.description}
+                            {session.description}
                           </span>
                         )}
 
                         <div className="flex flex-wrap items-center gap-2">
                           <div className="flex items-center gap-1 text-[11px] text-text-secondary">
                             <Clock size={11} />
-                            <span>{formatDuration(log.duration)}</span>
+                            <span>{formatDuration(session.duration)}</span>
                           </div>
                         </div>
                       </div>
@@ -427,7 +477,7 @@ export default function LogHistory({
                         {isEditing ? (
                           <div className="flex items-center gap-1.5">
                             <button
-                              onClick={() => saveEdit(log.id)}
+                              onClick={() => saveEdit(session.segmentIds)}
                               className="rounded p-1 text-emerald-600"
                             >
                               <Check size={16} />
@@ -442,13 +492,13 @@ export default function LogHistory({
                         ) : (
                           <div className="flex items-center gap-1">
                             <button
-                              onClick={() => startEditing(log)}
+                              onClick={() => startEditing(session)}
                               className="rounded p-1 text-text-secondary"
                             >
                               <Edit2 size={14} />
                             </button>
                             <button
-                              onClick={() => onDeleteLog(log.id)}
+                              onClick={() => onDeleteLog(session.segmentIds)}
                               className="rounded p-1 text-text-secondary"
                             >
                               <Trash2 size={14} />
@@ -459,8 +509,7 @@ export default function LogHistory({
                     </div>
 
                     <div className="mt-3 flex flex-wrap justify-between pt-3 text-[11px] text-text-secondary">
-                      <span>{formatDate(log.startTime)}</span>
-                      <span>{formatTimeRange(log.startTime, log.endTime)}</span>
+                      <span>{formatSessionDate(session.startTime, session.endTime)}</span>
                     </div>
                   </div>
                 );

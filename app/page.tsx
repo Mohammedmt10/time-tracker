@@ -169,44 +169,50 @@ export default function Home() {
     }
   };
 
-  const handleDeleteLog = async (id: string) => {
+  const handleDeleteLog = async (idOrIds: string | string[]) => {
     if (!token) return;
+    const ids = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
     if (confirm("Are you sure you want to delete this log entry?")) {
       try {
-        const res = await authFetch(`/api/logs/${id}`, {
-          method: "DELETE",
-        });
-
-        if (res.ok) {
-          setLogs((prev) => prev.filter((log) => log.id !== id));
-        }
+        await Promise.all(
+          ids.map((id) =>
+            authFetch(`/api/logs/${id}`, {
+              method: "DELETE",
+            })
+          )
+        );
+        const idSet = new Set(ids);
+        setLogs((prev) => prev.filter((log) => !idSet.has(log.id)));
       } catch (err) {
         // Delete failed
       }
     }
   };
 
-  const handleUpdateLog = async (id: string, description: string) => {
+  const handleUpdateLog = async (idOrIds: string | string[], description: string) => {
     if (!token) return;
+    const ids = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
     try {
-      const res = await authFetch(`/api/logs/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ description }),
-      });
-
-      if (res.ok) {
-        setLogs((prev) =>
-          prev.map((log) => {
-            if (log.id === id) {
-              return { ...log, description };
-            }
-            return log;
+      await Promise.all(
+        ids.map((id) =>
+          authFetch(`/api/logs/${id}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ description }),
           })
-        );
-      }
+        )
+      );
+      const idSet = new Set(ids);
+      setLogs((prev) =>
+        prev.map((log) => {
+          if (idSet.has(log.id)) {
+            return { ...log, description };
+          }
+          return log;
+        })
+      );
     } catch (err) {
       // Update failed
     }
