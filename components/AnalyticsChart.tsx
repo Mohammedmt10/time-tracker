@@ -28,31 +28,33 @@ export default function AnalyticsChart({
     ? logs.filter((l) => l.description.trim() === selectedTask)
     : logs;
 
-  // Get the last 7 days starting from today backwards
+  // Get the last 7 days starting from today backwards (aligned to UTC midnight)
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    d.setHours(0, 0, 0, 0);
-    return d;
+    // Create a Date representing midnight UTC of this day
+    return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0));
   }).reverse();
 
   // Aggregate hours for each of the last 7 days
   const chartData = last7Days.map((date) => {
-    const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
+    const dayName = date.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
     const dayLabel = date.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
+      timeZone: "UTC",
     });
 
-    const nextDay = new Date(date);
-    nextDay.setDate(nextDay.getDate() + 1);
+    const dayStart = date.getTime();
+    const dayEnd = dayStart + 24 * 60 * 60 * 1000;
 
     const dayLogs = activeLogs.filter((log) => {
-      const logTime = new Date(log.startTime);
-      return logTime >= date && logTime < nextDay;
+      const logTime = new Date(log.startTime).getTime();
+      return logTime >= dayStart && logTime < dayEnd;
     });
 
     const totalSeconds = dayLogs.reduce((acc, log) => acc + log.duration, 0);
+
     const hours = Number((totalSeconds / 3600).toFixed(2));
 
     return {

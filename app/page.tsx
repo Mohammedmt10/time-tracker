@@ -133,7 +133,7 @@ export default function Home() {
     });
   };
 
-  const handleLogTime = async (newLogData: Omit<TimeLog, "id">) => {
+  const handleLogTime = async (newLogData: Omit<TimeLog, "id"> & { timeZone: string }) => {
     if (!token) return;
     try {
       const res = await authFetch("/api/logs", {
@@ -146,17 +146,22 @@ export default function Home() {
 
       if (res.ok) {
         const data = await res.json();
-        const newLog: TimeLog = {
-          id: data.log.id,
-          description: data.log.description,
-          project: data.log.project,
-          startTime: data.log.startTime,
-          endTime: data.log.endTime,
-          duration: data.log.duration,
-        };
+        const newLogs: TimeLog[] = data.logs
+          .map((log: TimeLog) => ({
+            id: log.id,
+            description: log.description,
+            project: log.project,
+            startTime: log.startTime,
+            endTime: log.endTime,
+            duration: log.duration,
+          }))
+          .sort(
+            (a: TimeLog, b: TimeLog) =>
+              new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+          );
         setLogs((prev) => {
-          const filtered = prev.filter((log) => log.id !== newLog.id);
-          return [newLog, ...filtered];
+          const newIds = new Set(newLogs.map((log) => log.id));
+          return [...newLogs, ...prev.filter((log) => !newIds.has(log.id))];
         });
       }
     } catch (err) {

@@ -22,35 +22,41 @@ export default function StatsPanel({ logs }: StatsPanelProps) {
     return hrs.toFixed(1);
   };
 
-  // Get current date boundaries
+  // Helper to get total seconds for logs starting within a window
+  const getLogsDurationInWindow = (windowStart: Date, windowEnd: Date) => {
+    const startMs = windowStart.getTime();
+    const endMs = windowEnd.getTime();
+
+    const filtered = logs.filter((log) => {
+      const logStart = new Date(log.startTime).getTime();
+      return logStart >= startMs && logStart < endMs;
+    });
+
+    return filtered.reduce((acc, log) => acc + log.duration, 0);
+  };
+
+  // Get current date boundaries in UTC
   const now = new Date();
 
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
+  const startOfTodayUtc = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0));
+  const endOfTodayUtc = new Date(startOfTodayUtc.getTime() + 24 * 60 * 60 * 1000);
 
-  // Start of this week (Monday)
+  // Start of this week (Monday) in UTC
   const startOfWeek = new Date();
   const day = startOfWeek.getDay();
   const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
   startOfWeek.setDate(diff);
-  startOfWeek.setHours(0, 0, 0, 0);
+  const startOfWeekUtc = new Date(Date.UTC(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate(), 0, 0, 0, 0));
+  const endOfWeekUtc = new Date(startOfWeekUtc.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  // Start of this month
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  // Filter logs
-  const todayLogs = logs.filter(
-    (log) => new Date(log.startTime) >= startOfToday,
-  );
-  const weekLogs = logs.filter((log) => new Date(log.startTime) >= startOfWeek);
-  const monthLogs = logs.filter(
-    (log) => new Date(log.startTime) >= startOfMonth,
-  );
+  // Start of this month in UTC
+  const startOfMonthUtc = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0));
+  const endOfMonthUtc = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0));
 
   // Sum durations
-  const todaySeconds = todayLogs.reduce((acc, log) => acc + log.duration, 0);
-  const weekSeconds = weekLogs.reduce((acc, log) => acc + log.duration, 0);
-  const monthSeconds = monthLogs.reduce((acc, log) => acc + log.duration, 0);
+  const todaySeconds = getLogsDurationInWindow(startOfTodayUtc, endOfTodayUtc);
+  const weekSeconds = getLogsDurationInWindow(startOfWeekUtc, endOfWeekUtc);
+  const monthSeconds = getLogsDurationInWindow(startOfMonthUtc, endOfMonthUtc);
 
   // Progress relative to daily 8-hour goal
   const dailyGoalHours = 8;

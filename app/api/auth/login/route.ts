@@ -112,8 +112,18 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    console.error("LOGIN ERROR:");
+    console.error(error);
+
     return Response.json(
-      { error: "Internal server error." },
+      {
+        error: error instanceof Error ? error.message : String(error),
+        stack:
+          process.env.NODE_ENV === "development" &&
+            error instanceof Error
+            ? error.stack
+            : undefined,
+      },
       { status: 500 }
     );
   }
