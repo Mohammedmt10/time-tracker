@@ -26,7 +26,6 @@ const createLogSchema = z
     project: z.string().min(1).max(100).optional().default("General"),
     startTime: z.string().datetime({ message: "startTime must be an ISO 8601 datetime string" }),
     endTime: z.string().datetime({ message: "endTime must be an ISO 8601 datetime string" }),
-    duration: z.number().int().positive("Duration must be a positive integer (seconds)"),
     timeZone: z
       .string()
       .optional()
@@ -247,11 +246,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { description, project, startTime, endTime, duration, timeZone } = parsed.data;
+    const { description, project, startTime, endTime, timeZone } = parsed.data;
+
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    const duration = Math.round((end.getTime() - start.getTime()) / 1000);
 
     const segments = splitByDay(
-      new Date(startTime),
-      new Date(endTime),
+      start,
+      end,
       duration,
       timeZone
     );

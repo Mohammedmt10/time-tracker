@@ -28,21 +28,20 @@ export default function AnalyticsChart({
     ? logs.filter((l) => l.description.trim() === selectedTask)
     : logs;
 
-  // Get the last 7 days starting from today backwards (aligned to UTC midnight)
+  // Get the last 7 days starting from today backwards (aligned to local midnight)
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    // Create a Date representing midnight UTC of this day
-    return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0));
+    // Create a Date representing midnight local time of this day
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
   }).reverse();
 
   // Aggregate hours for each of the last 7 days
   const chartData = last7Days.map((date) => {
-    const dayName = date.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
+    const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
     const dayLabel = date.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
-      timeZone: "UTC",
     });
 
     const dayStart = date.getTime();

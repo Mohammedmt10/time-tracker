@@ -10,7 +10,6 @@ interface TimeTrackerProps {
     project: string;
     startTime: string;
     endTime: string;
-    duration: number; // in seconds
     timeZone: string;
   }) => void;
   recentTasks?: string[];
@@ -55,7 +54,6 @@ export default function TimeTracker({ onLogTime, recentTasks = [] }: TimeTracker
           project: "General",
           startTime: startTimeRef.current,
           endTime,
-          duration: seconds,
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         };
 
@@ -105,7 +103,6 @@ export default function TimeTracker({ onLogTime, recentTasks = [] }: TimeTracker
       project: "General",
       startTime: startTimeRef.current,
       endTime,
-      duration: seconds,
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
 

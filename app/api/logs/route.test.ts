@@ -84,7 +84,6 @@ describe("POST /api/logs", () => {
         description: "",
         startTime: "not-a-date",
         endTime: "2026-07-10T12:00:00.000Z",
-        duration: -5,
       })
     );
 
@@ -101,7 +100,6 @@ describe("POST /api/logs", () => {
         project: "Docs",
         startTime: "2026-07-10T10:00:00.000Z",
         endTime: "2026-07-10T12:00:00.000Z",
-        duration: 7200,
       })
     );
 
@@ -122,7 +120,6 @@ describe("POST /api/logs", () => {
         project: "Ops",
         startTime: "2026-07-10T23:00:00.000Z",
         endTime: "2026-07-11T01:00:00.000Z",
-        duration: 7200, // 2 hours total
       })
     );
 
@@ -154,7 +151,6 @@ describe("POST /api/logs", () => {
         project: "Ops",
         startTime: "2026-07-10T23:00:00.000Z",
         endTime: "2026-07-13T02:00:00.000Z", // spans 3 midnight boundaries
-        duration: 3 * 3600 + 2 * 24 * 3600, // 3h across boundaries + 2 full days
       })
     );
 
@@ -186,7 +182,6 @@ describe("POST /api/logs", () => {
         project: "Ops",
         startTime: "2026-07-10T16:00:00.000Z",
         endTime: "2026-07-10T20:00:00.000Z",
-        duration: 4 * 3600,
         timeZone: "Asia/Dhaka",
       })
     );
@@ -211,7 +206,6 @@ describe("POST /api/logs", () => {
         project: "Ops",
         startTime: "2026-07-10T17:00:00.000Z",
         endTime: "2026-07-12T04:00:00.000Z",
-        duration: 35 * 3600,
         timeZone: "Asia/Dhaka",
       })
     );
@@ -226,6 +220,28 @@ describe("POST /api/logs", () => {
     ]);
   });
 
+  it("splits a 60-hour session starting at Monday 22:00 to Thursday 10:00 local time into segments", async () => {
+    const res = await POST(
+      makeRequest({
+        description: "Mock Marathon",
+        project: "General",
+        startTime: "2026-07-06T16:30:00.000Z", // Mon 22:00 Asia/Kolkata
+        endTime: "2026-07-09T04:30:00.000Z",   // Thu 10:00 Asia/Kolkata
+        timeZone: "Asia/Kolkata",
+      })
+    );
+
+    expect(res.status).toBe(201);
+    const { logs } = await res.json();
+    expect(logs).toHaveLength(4);
+    expect(logs.map((log: { duration: number }) => log.duration)).toEqual([
+      2 * 3600,
+      24 * 3600,
+      24 * 3600,
+      10 * 3600,
+    ]);
+  });
+
   it("splits a 35-hour session starting at 23:23 Sunday into segments", async () => {
     const res = await POST(
       makeRequest({
@@ -233,7 +249,6 @@ describe("POST /api/logs", () => {
         project: "Ops",
         startTime: "2026-07-05T23:23:00.000Z",
         endTime: "2026-07-07T10:23:00.000Z",
-        duration: 35 * 3600,
         timeZone: "UTC",
       })
     );
@@ -254,8 +269,7 @@ describe("POST /api/logs", () => {
         description: "Odd duration",
         project: "Ops",
         startTime: "2026-07-10T23:00:00.000Z",
-        endTime: "2026-07-13T00:00:01.000Z",
-        duration: 12345,
+        endTime: "2026-07-11T02:25:45.000Z",
       })
     );
 
@@ -271,7 +285,6 @@ describe("POST /api/logs", () => {
         description: "Bad zone",
         startTime: "2026-07-10T10:00:00.000Z",
         endTime: "2026-07-10T12:00:00.000Z",
-        duration: 7200,
         timeZone: "Not/AZone",
       })
     );
@@ -286,7 +299,6 @@ describe("POST /api/logs", () => {
         description: "Inverted range",
         startTime: "2026-07-10T12:00:00.000Z",
         endTime: "2026-07-10T10:00:00.000Z",
-        duration: 7200,
       })
     );
 
@@ -313,8 +325,7 @@ describe("POST /api/logs", () => {
         description: "Write report",
         project: "Docs",
         startTime: "2026-07-10T10:00:00.000Z",
-        endTime: "2026-07-10T11:00:00.000Z",
-        duration: 1800,
+        endTime: "2026-07-10T10:30:00.000Z",
       })
     );
 

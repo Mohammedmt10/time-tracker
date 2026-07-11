@@ -133,7 +133,7 @@ export default function Home() {
     });
   };
 
-  const handleLogTime = async (newLogData: Omit<TimeLog, "id"> & { timeZone: string }) => {
+  const handleLogTime = async (newLogData: Omit<TimeLog, "id" | "duration"> & { timeZone: string }) => {
     if (!token) return;
     try {
       const res = await authFetch("/api/logs", {
