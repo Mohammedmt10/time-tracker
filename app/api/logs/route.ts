@@ -200,12 +200,26 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    console.error("POST /api/logs error:", error);
+
     if (error instanceof AuthError) {
       return unauthorizedResponse(error.message);
     }
 
     return Response.json(
-      { error: "Internal server error." },
+      {
+        error: error instanceof Error ? error.message : "Internal server error.",
+        details:
+          error instanceof Error
+            ? {
+              name: error.name,
+              stack:
+                process.env.NODE_ENV === "development"
+                  ? error.stack
+                  : undefined,
+            }
+            : undefined,
+      },
       { status: 500 }
     );
   }
