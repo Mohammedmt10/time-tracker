@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Clock, Calendar, Award } from "lucide-react";
 
 interface TimeLog {
@@ -16,11 +17,18 @@ interface StatsPanelProps {
 }
 
 export default function StatsPanel({ logs }: StatsPanelProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Helper to format hours
   const formatHours = (seconds: number) => {
     const hrs = seconds / 3600;
     return hrs.toFixed(1);
   };
+
 
   // Helper to get total seconds for logs starting within a window
   const getLogsDurationInWindow = (windowStart: Date, windowEnd: Date) => {
@@ -34,6 +42,16 @@ export default function StatsPanel({ logs }: StatsPanelProps) {
 
     return filtered.reduce((acc, log) => acc + log.duration, 0);
   };
+
+  if (!mounted) {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="group relative overflow-hidden rounded-2xl bg-card-bg p-5 shadow-card h-[146px] animate-pulse" />
+        <div className="group relative overflow-hidden rounded-2xl bg-card-bg p-5 shadow-card h-[146px] animate-pulse" />
+        <div className="group relative overflow-hidden rounded-2xl bg-card-bg p-5 shadow-card h-[146px] animate-pulse" />
+      </div>
+    );
+  }
 
   // Get current date boundaries in local time
   const now = new Date();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BarChart3 } from "lucide-react";
 
 interface TimeLog {
@@ -22,6 +22,35 @@ export default function AnalyticsChart({
   selectedTask,
 }: AnalyticsChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="rounded-2xl bg-card-bg p-6 shadow-card h-[344px] flex flex-col justify-between">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="text-black dark:text-white opacity-40" size={18} />
+            <div className="h-5 w-40 bg-panel-bg rounded-lg animate-pulse" />
+          </div>
+          <div className="h-4 w-28 bg-panel-bg rounded-md animate-pulse" />
+        </div>
+        <div className="flex-1 flex items-end justify-between gap-4 px-4 pb-2">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div
+              key={i}
+              className="w-[36px] bg-panel-bg/40 rounded-t-lg animate-pulse"
+              style={{ height: `${20 + (i % 3) * 15}%` }}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
 
   // If a task is selected, filter logs to only that task's entries
   const activeLogs = selectedTask
