@@ -279,6 +279,25 @@ describe("POST /api/logs", () => {
     expect(total).toBe(12345);
   });
 
+  it("uses the custom duration if provided in the payload", async () => {
+    const res = await POST(
+      makeRequest({
+        description: "Write report with breaks",
+        project: "Docs",
+        startTime: "2026-07-10T10:00:00.000Z",
+        endTime: "2026-07-10T12:00:00.000Z",
+        duration: 3600,
+      })
+    );
+
+    expect(res.status).toBe(201);
+    expect(mockedCreate).toHaveBeenCalledTimes(1);
+
+    const { logs } = await res.json();
+    expect(logs).toHaveLength(1);
+    expect(logs[0].duration).toBe(3600);
+  });
+
   it("rejects an invalid timeZone", async () => {
     const res = await POST(
       makeRequest({

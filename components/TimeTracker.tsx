@@ -11,6 +11,7 @@ interface TimeTrackerProps {
     startTime: string;
     endTime: string;
     timeZone: string;
+    duration?: number;
   }) => void;
   recentTasks?: string[];
 }
@@ -55,6 +56,7 @@ export default function TimeTracker({ onLogTime, recentTasks = [] }: TimeTracker
           startTime: startTimeRef.current,
           endTime,
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          duration: seconds,
         };
 
         // Use keepalive: true to ensure the request completes after browser/tab closes
@@ -104,6 +106,7 @@ export default function TimeTracker({ onLogTime, recentTasks = [] }: TimeTracker
       startTime: startTimeRef.current,
       endTime,
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      duration: seconds,
     });
 
     // Reset state

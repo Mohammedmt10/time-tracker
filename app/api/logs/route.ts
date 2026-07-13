@@ -31,6 +31,7 @@ const createLogSchema = z
       .optional()
       .default("UTC")
       .refine(isValidTimeZone, { message: "timeZone must be a valid IANA time zone" }),
+    duration: z.number().int().nonnegative().optional(),
   })
   .refine((data) => new Date(data.endTime) > new Date(data.startTime), {
     message: "endTime must be after startTime",
@@ -246,11 +247,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { description, project, startTime, endTime, timeZone } = parsed.data;
+    const { description, project, startTime, endTime, timeZone, duration: customDuration } = parsed.data;
 
     const start = new Date(startTime);
     const end = new Date(endTime);
-    const duration = Math.round((end.getTime() - start.getTime()) / 1000);
+    const duration = customDuration !== undefined
+      ? customDuration
+      : Math.round((end.getTime() - start.getTime()) / 1000);
 
     const segments = splitByDay(
       start,
