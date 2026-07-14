@@ -45,6 +45,37 @@ export default function TimeTracker({ onLogTime, recentTasks = [] }: TimeTracker
     };
   }, [isActive, isPaused]);
 
+  // Listen for spacebar to pause/resume when active
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code === "Space") {
+        if (!isActive) return;
+
+        // Ignore spacebar if user is typing or interacting with form inputs/buttons
+        const activeElement = document.activeElement;
+        if (
+          activeElement &&
+          (activeElement.tagName === "INPUT" ||
+            activeElement.tagName === "TEXTAREA" ||
+            activeElement.tagName === "BUTTON" ||
+            activeElement.tagName === "SELECT" ||
+            (activeElement as HTMLElement).isContentEditable)
+        ) {
+          return;
+        }
+
+        // Prevent default spacebar scrolling
+        event.preventDefault();
+        setIsPaused((prev) => !prev);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isActive]);
+
   // Listen for page unload/tab close to automatically save the active session to the DB
   useEffect(() => {
     const handleBeforeUnload = () => {
