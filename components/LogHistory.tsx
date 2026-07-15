@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
   Trash2,
@@ -38,6 +39,38 @@ export default function LogHistory({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDesc, setEditDesc] = useState("");
+  const [visibleCount, setVisibleCount] = useState(5);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const prevVisibleCountRef = useRef(visibleCount);
+
+  // Reset visible count when filters or search change
+  const [prevSearch, setPrevSearch] = useState(searchTerm);
+  const [prevFilter, setPrevFilter] = useState(selectedFilterTask);
+
+  if (searchTerm !== prevSearch || selectedFilterTask !== prevFilter) {
+    setPrevSearch(searchTerm);
+    setPrevFilter(selectedFilterTask);
+    setVisibleCount(5);
+  }
+
+  // Smoothly scroll down as container expands, adding extra bottom padding offset
+  useEffect(() => {
+    if (visibleCount > prevVisibleCountRef.current) {
+      const timer = setTimeout(() => {
+        if (containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect();
+          const targetY = window.scrollY + rect.bottom - window.innerHeight + 80;
+          window.scrollTo({
+            top: targetY,
+            behavior: "smooth",
+          });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+    prevVisibleCountRef.current = visibleCount;
+  }, [visibleCount]);
 
   const formatDuration = (secs: number) => {
     const hrs = Math.floor(secs / 3600);
@@ -224,7 +257,7 @@ export default function LogHistory({
   };
 
   return (
-    <div className="rounded-2xl bg-card-bg p-6 shadow-card">
+    <div ref={containerRef} className="rounded-2xl bg-card-bg p-6 shadow-card">
       {/* Header and Controls */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
@@ -346,7 +379,11 @@ export default function LogHistory({
             </span>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <motion.div
+            layout
+            transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+          >
+            <div className="overflow-x-auto">
             {/* Desktop Table View */}
             <table className="hidden w-full min-w-[600px] border-collapse text-left text-sm md:table">
               <thead>
@@ -364,11 +401,20 @@ export default function LogHistory({
                 </tr>
               </thead>
               <tbody className="divide-y divide-panel-bg/20">
-                {groupedSessions.map((session) => {
-                  const isEditing = editingId === session.id;
+                <AnimatePresence initial={false}>
+                  {groupedSessions.slice(0, visibleCount).map((session) => {
+                    const isEditing = editingId === session.id;
 
-                  return (
-                    <tr key={session.id} className="hover:bg-panel-bg/30">
+                    return (
+                      <motion.tr
+                        key={session.id}
+                        layout
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.25, ease: "easeOut" }}
+                        className="hover:bg-panel-bg/30"
+                      >
                       {/* Description cell */}
                       <td className="py-3.5 px-4">
                         {isEditing ? (
@@ -436,19 +482,29 @@ export default function LogHistory({
                           </div>
                         )}
                       </td>
-                    </tr>
-                  );
-                })}
+                      </motion.tr>
+                    );
+                  })}
+                </AnimatePresence>
               </tbody>
             </table>
 
             {/* Mobile List View */}
             <div className="flex flex-col gap-3 md:hidden">
-              {groupedSessions.map((session) => {
-                const isEditing = editingId === session.id;
+              <AnimatePresence initial={false}>
+                {groupedSessions.slice(0, visibleCount).map((session) => {
+                  const isEditing = editingId === session.id;
 
-                return (
-                  <div key={session.id} className="rounded-xl bg-panel-bg/25 p-4">
+                  return (
+                    <motion.div
+                      key={session.id}
+                      layout
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.25, ease: "easeOut" }}
+                      className="rounded-xl bg-panel-bg/25 p-4"
+                    >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 space-y-1.5">
                         {isEditing ? (
@@ -511,12 +567,27 @@ export default function LogHistory({
                     <div className="mt-3 flex flex-wrap justify-between pt-3 text-[11px] text-text-secondary">
                       <span>{formatSessionDate(session.startTime, session.endTime)}</span>
                     </div>
-                  </div>
-                );
-              })}
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
             </div>
           </div>
-        )}
+
+          {groupedSessions.length > visibleCount && (
+            <motion.div layout className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setVisibleCount((prev) => prev + 5)}
+                className="flex items-center gap-1.5 rounded-xl border border-text-secondary/10 bg-input-bg px-4 py-2 text-xs font-semibold text-text-secondary hover:bg-panel-bg focus:outline-none transition-all cursor-pointer"
+              >
+                <ChevronDown size={14} className="text-text-secondary" />
+                Load More
+              </button>
+            </motion.div>
+          )}
+        </motion.div>
+      )}
       </div>
     </div>
   );
